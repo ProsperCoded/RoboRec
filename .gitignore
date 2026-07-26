@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+build/
+dist/
+
+# uv
+.python-version
+
+# Nuitka build artifacts
+*.build/
+*.dist/
+*.onefile-build/
+
+# Windows/NSIS
+*.exe
+*.msi
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reports / logs
+*.log
+gpu_report*.json
+
+# Test VM state (if ever referenced locally)
+*.vdi
+*.vbox

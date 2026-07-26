@@ -1,0 +1,3 @@
+[submodule "vendor/btcrecover"]
+	path = vendor/btcrecover
+	url = https://github.com/3rdIteration/btcrecover.git
