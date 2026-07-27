@@ -40,7 +40,7 @@ Robo-Rec is a Windows desktop application for recovering damaged, incomplete, or
 ### 4.2 Missing Word Recovery
 - Supports 1, 2, or 3 missing words, for both 12-word and 24-word phrases.
 - Known word positions required as input (unknown positions multiply search space and increase time significantly, particularly at 3 words).
-- 4+ missing words: not supported at any GPU tier (local or cloud) — 2,048⁴ ≈ 17.6 trillion combinations is outside practical turnaround even on enterprise-grade GPUs.
+- 5+ missing words: not supported at any GPU tier (local or cloud) — 2,048⁴ ≈ 17.6 trillion combinations is outside practical turnaround even on enterprise-grade GPUs.
 
 ### 4.3 Typo / Error Correction
 - Support correcting individual mistyped words within an otherwise-complete phrase, using btcrecover's typo/pattern engine.

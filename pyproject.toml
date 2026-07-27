@@ -11,6 +11,7 @@ dependencies = [
     "protobuf~=5.29.6",
     "coincurve==20.0.0; python_version < '3.13'",
     "coincurve==21.0.0; python_version >= '3.13'",
+    "py-crypto-hd-wallet>=1.3.3",
 ]
 
 [dependency-groups]
