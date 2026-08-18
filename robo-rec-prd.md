@@ -1,8 +1,12 @@
 # Robo-Rec — Technical Product Requirements Document
 
-**Version:** 1.0
+**Version:** 1.1
 **Type:** Windows Desktop Application
 **Status:** Approved for development
+
+**Revision history:**
+- 1.1 — Clarified missing-word recovery scope: known positions support 1-4 words; unknown positions support only 1-2 words (3+ unknown-position combinatorics exceed the existing known-position infeasibility bar). See Section 4.2 and Section 9.
+- 1.0 — Initial approved version.
 
 ---
 
@@ -22,10 +26,12 @@ Robo-Rec is a Windows desktop application for recovering damaged, incomplete, or
 ## 3. Non-Goals (Explicitly Out of Scope)
 
 - Cloud GPU rental / distributed compute integration.
-- Recovering 4 or more missing words in any configuration.
+- Recovering 5 or more missing words when positions are known.
+- Recovering 3 or more missing words when positions are unknown (combinatorially worse than the 5+ known-position cutoff above — see Section 4.2).
 - Full rearrangement of a 24-word phrase from completely unknown positions.
 - Balance checking / blockchain API integration of any kind.
 - wallet.dat password/passphrase recovery or file corruption repair (separate, unscoped feature — different client ask, not part of this build).
+- Recovery operations (missing words, scrambled seed phrase, etc.) without providing a target wallet address (checksum-only enumeration is out of scope for v1).
 - Non-English wordlists (initial release).
 
 ---
@@ -38,9 +44,11 @@ Robo-Rec is a Windows desktop application for recovering damaged, incomplete, or
 - **24-word, fully scrambled (all positions unknown):** Not supported. 24! is computationally infeasible under any realistic hardware budget.
 
 ### 4.2 Missing Word Recovery
-- Supports 1, 2, or 3 missing words, for both 12-word and 24-word phrases.
-- Known word positions required as input (unknown positions multiply search space and increase time significantly, particularly at 3 words).
-- 5+ missing words: not supported at any GPU tier (local or cloud) — 2,048⁴ ≈ 17.6 trillion combinations is outside practical turnaround even on enterprise-grade GPUs.
+- **Known positions:** Supports 1, 2, 3, or 4 missing words, for both 12-word and 24-word phrases. User specifies which position(s) are blank. Cost is `2,048^n` regardless of total phrase length.
+- **Unknown positions:** Supports 1 or 2 missing words only. The app must also search over which position(s) are blank, multiplying cost by `C(total_words, n)`. 2 missing words with unknown positions is ~66x more expensive than 2 missing with known positions (still CPU-feasible; see Section 9).
+- 4 missing words (known positions) is GPU-strongly-recommended: 2,048⁴ ≈ 17.6 trillion combinations is impractical on CPU and pushes even GPU turnaround into a long-running job (hours to days depending on hardware tier) — attempted and supported, but the GUI should clearly warn the user of the expected duration before starting.
+- 5+ missing words with known positions: not supported at any GPU tier (local or cloud) — search space grows past practical turnaround even on enterprise-grade GPUs.
+- 3+ missing words with unknown positions: not supported — for a 12-word phrase this is already ~1.9 trillion combinations (worse than the 5+ known-position cutoff above), and grows further for 24-word phrases.
 
 ### 4.3 Typo / Error Correction
 - Support correcting individual mistyped words within an otherwise-complete phrase, using btcrecover's typo/pattern engine.
@@ -48,8 +56,8 @@ Robo-Rec is a Windows desktop application for recovering damaged, incomplete, or
 ### 4.4 Wallet Address Derivation & Verification
 - User specifies the target token (Bitcoin, Ethereum, or other BIP39-compatible token).
 - App derives addresses by iterating standard derivation paths (BIP-44, BIP-49, BIP-84) covering common wallet software (MetaMask, Trust Wallet, Ledger, Trezor, etc.).
-- **With target address provided:** app confirms match and reports which path/wallet type it corresponds to.
-- **Without target address:** app still derives and displays the standard first address(es) for the recovered phrase, without a verification step.
+- **For recovery operations (scrambled phrase, missing words, etc.):** A target wallet address must always be provided. The app uses it to confirm a match and identify the correct phrase. Recovery without a target address (checksum-only enumeration) is not supported in v1.
+- **For complete seed phrases (standard derivation only):** If the user inputs a complete phrase without recovery, providing a target address is optional; the app can derive and display the standard first address(es) without a verification step.
 - No balance, transaction history, or blockchain lookups of any kind — address derivation is purely local/offline math.
 
 ### 4.5 GPU Detection & Reporting
@@ -133,11 +141,14 @@ Robo-Rec is a Windows desktop application for recovering damaged, incomplete, or
 | 12-word, fully scrambled | Yes | 1–2 hrs (CPU) |
 | 24-word, known-correct segment + scrambled remainder | Yes | Depends on scrambled segment size (e.g., 12-word segment ≈ 1–2 hrs) |
 | 24-word, fully scrambled (unknown positions) | No | Infeasible (24! combinations) |
-| 1 missing word | Yes | Minutes |
+| 1 missing word (known position) | Yes | Minutes |
+| 1 missing word (unknown position) | Yes | Minutes (~12-24x known-position cost, still trivial) |
 | 2 missing words (known positions) | Yes | Up to a few hours |
+| 2 missing words (unknown positions) | Yes | Longer than known-position (~66x more combinations); CPU-feasible |
 | 3 missing words (known positions) | Yes | Hours, faster with GPU |
-| 3 missing words (unknown positions) | Marginal | GPU strongly recommended |
-| 4 missing words (any hardware tier) | No | Infeasible even with enterprise cloud GPUs (~trillions of combinations) |
+| 3 missing words (unknown positions) | No | Infeasible (~1.9 trillion combinations for a 12-word phrase) |
+| 4 missing words (known positions) | Marginal | Hours to days; GPU strongly recommended (~17.6 trillion combinations) |
+| 5+ missing words (known positions) | No | Infeasible even with enterprise cloud GPUs |
 | Typo correction (complete phrase) | Yes | Fast |
 
 ---
@@ -147,6 +158,7 @@ Robo-Rec is a Windows desktop application for recovering damaged, incomplete, or
 - wallet.dat password/passphrase recovery — raised by a separate client contact (Peter); not part of current scope, would require distinct tooling and a separate scoping conversation if pursued.
 - Cloud GPU rental integration — technically possible via a remote job-dispatch architecture, but explicitly excluded from current build due to added complexity, cost management, and security surface.
 - Non-English BIP39 wordlist support.
+- Checksum-only recovery without target address (enumerating and listing all valid seeds based on BIP39 checksum alone).
 
 ---
 
