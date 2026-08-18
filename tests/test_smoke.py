@@ -1,4 +1,4 @@
-from robo_rec.main import MainWindow
+from robo_rec.gui.main_window import MainWindow
 
 
 def test_main_window_creates(qtbot):
