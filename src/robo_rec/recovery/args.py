@@ -44,6 +44,15 @@ def build_rearrangement_args(spec: RearrangementSpec) -> tuple[list[str], Path]:
         spec.wallet_type,
         "--tokenlist",
         str(tokenlist_path),
+        # --tokenlist mode cannot infer phrase length or wordlist language on its own;
+        # seedrecover.py exits immediately with "Error: Mnemonic length needs to be
+        # specificed if using tokenlist or passwordlist" (and then, once that's fixed,
+        # the equivalent error for --language) without these (confirmed by direct
+        # terminal testing — see robo-rec-implementation.md).
+        "--mnemonic-length",
+        str(len(spec.known_words)),
+        "--language",
+        "en",
         *_target_flags(spec.addrs, spec.mpk, spec.addr_limit),
         # Deliberately NOT passing --keep-tokens-order: permutation of the unanchored
         # (scrambled) tokens is the whole point of this scenario.

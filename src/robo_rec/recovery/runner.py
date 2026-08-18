@@ -88,8 +88,6 @@ class BtcrecoverRunner:
         self._tokenlist_path = tokenlist_path
         full_argv = [python_executable(), str(seedrecover_script()), *argv]
 
-        yield RecoveryEvent(kind="started", message="Starting recovery search...")
-
         try:
             process, lines = stream_lines(
                 full_argv, cwd=self._btcrecover_dir, stop_event=self._stop_event
@@ -97,7 +95,14 @@ class BtcrecoverRunner:
         except OSError as exc:
             raise LaunchError(f"Failed to launch seedrecover.py: {exc}") from exc
 
+        # Assign self._process BEFORE yielding: cancel() reads self._process, and once
+        # control returns to the caller after a yield, cancel() may be called immediately
+        # (e.g. a GUI Cancel button right after seeing the "started" event). If the
+        # assignment happened after this yield, an early cancel() would be a silent no-op
+        # and the subprocess would run to completion unattended.
         self._process = process
+
+        yield RecoveryEvent(kind="started", message="Starting recovery search...")
         found_result: RecoveryResult | None = None
         mnemonic: str | None = None
         matched_path: str | None = None

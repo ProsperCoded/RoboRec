@@ -114,10 +114,12 @@ def test_cancel_stops_a_running_search():
 
 @pytest.mark.slow
 def test_rearrangement_end_to_end():
+    # Only the last 4 words are left unknown (4! = 24 permutations) — a full 12-word
+    # scramble (or even a 10-word unknown segment) is genuinely a many-minutes-to-hours
+    # job (PRD Section 9) and not something to run routinely, even under a `slow` marker.
     words, address = _fresh_pair()
-    known = [None] * 12
-    known[0], known[1] = words[0], words[1]
-    scrambled = words[2:]
+    known: list[str | None] = list(words[:8]) + [None] * 4
+    scrambled = words[8:]
     spec = RearrangementSpec(
         known_words=known, scrambled_words=scrambled, wallet_type="bip39", addrs=[address]
     )
@@ -126,3 +128,4 @@ def test_rearrangement_end_to_end():
     _, result = _run_to_completion(runner)
 
     assert result.succeeded is True
+    assert result.mnemonic == " ".join(words)

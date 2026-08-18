@@ -88,6 +88,10 @@ def test_rearrangement_builds_tokenlist_and_argv():
         assert argv[argv.index("--tokenlist") + 1] == str(tokenlist_path)
         assert "--keep-tokens-order" not in argv
         assert "--mnemonic" not in argv
+        # --tokenlist mode requires both explicitly (seedrecover.py can't infer them from
+        # the tokenlist file itself — confirmed by direct terminal testing).
+        assert argv[argv.index("--mnemonic-length") + 1] == "12"
+        assert argv[argv.index("--language") + 1] == "en"
 
         content = tokenlist_path.read_text()
         lines = content.splitlines()
