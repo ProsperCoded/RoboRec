@@ -38,23 +38,32 @@ QMainWindow, #ContentArea {{
     border-right: 1px solid {BORDER};
 }}
 
-#SidebarActionsTab {{
+#SidebarBrand {{
+    color: {TEXT_PRIMARY};
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    padding-left: 8px;
+}}
+
+#SidebarNavItem {{
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 8px;
     color: {TEXT_SECONDARY};
     font-weight: 600;
-    letter-spacing: 1px;
-    padding: 10px 6px;
+    font-size: 13px;
+    text-align: left;
+    padding-left: 8px;
 }}
 
-#SidebarActionsTab:checked {{
+#SidebarNavItem:checked {{
     background-color: {ACCENT_DIM};
     border: 1px solid {ACCENT};
     color: {ACCENT};
 }}
 
-#SidebarActionsTab:hover {{
+#SidebarNavItem:hover {{
     color: {TEXT_PRIMARY};
     border: 1px solid {BORDER_STRONG};
 }}
@@ -206,7 +215,7 @@ SeedTile[blank="true"] {{
 
 #SeedTileWord {{
     font-family: {FONT_MONO};
-    font-size: 13px;
+    font-size: 12px;
     color: {TEXT_PRIMARY};
     background: transparent;
     border: none;
@@ -289,6 +298,17 @@ QPushButton#PrimaryButton:disabled {{
     color: {TEXT_SECONDARY};
     padding: 10px 12px;
     font-size: 12px;
+}}
+
+QProgressBar {{
+    background-color: {SURFACE_RAISED};
+    border: 1px solid {BORDER};
+    border-radius: 4px;
+}}
+
+QProgressBar::chunk {{
+    background-color: {ACCENT};
+    border-radius: 4px;
 }}
 
 QScrollBar:vertical {{

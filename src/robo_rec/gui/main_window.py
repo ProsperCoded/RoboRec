@@ -110,4 +110,7 @@ class MainWindow(QMainWindow):
     def _show_action(self, action: str) -> None:
         panel = self._panels_by_action.get(action)
         if panel is not None:
+            self._sidebar.set_active(False)
             self._stack.setCurrentWidget(panel)
+            if panel is self._missing_words_panel:
+                self._missing_words_panel.focus_first_word()

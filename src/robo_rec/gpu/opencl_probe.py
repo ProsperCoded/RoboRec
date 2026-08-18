@@ -50,8 +50,12 @@ def probe_opencl() -> OpenClProbeResult:
         return OpenClProbeResult(available=False, devices=[], error=str(exc))
 
     if completed.returncode != 0:
-        # e.g. pyopencl not installed, or no OpenCL platforms present on this machine.
-        return OpenClProbeResult(available=False, devices=[], error=completed.stderr.strip() or None)
+        # e.g. pyopencl not installed, or no OpenCL platforms present on this machine. The
+        # stderr is often a full Python traceback (confirmed on this dev machine — see
+        # module docstring); only the last non-empty line is kept as a human-readable summary.
+        stderr_lines = [ln for ln in completed.stderr.strip().splitlines() if ln.strip()]
+        summary = stderr_lines[-1].strip() if stderr_lines else None
+        return OpenClProbeResult(available=False, devices=[], error=summary)
 
     devices = _parse_devices(completed.stdout)
     return OpenClProbeResult(available=bool(devices), devices=devices, error=None)

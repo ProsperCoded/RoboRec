@@ -119,12 +119,12 @@ class TypoCorrectionSpec:
             raise InvalidSpecError("best_guess_mnemonic must not be empty.")
 
 
-RecoverySpec = Union[
-    RearrangementSpec,
-    MissingWordKnownPositionSpec,
-    MissingWordUnknownPositionSpec,
-    TypoCorrectionSpec,
-]
+RecoverySpec = (
+    RearrangementSpec
+    | MissingWordKnownPositionSpec
+    | MissingWordUnknownPositionSpec
+    | TypoCorrectionSpec
+)
 
 
 RecoveryEventKind = Literal[

@@ -38,3 +38,7 @@ extend-exclude = ["vendor"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: end-to-end recovery runs that take more than a few seconds (excluded by default)",
+]
+addopts = "-m 'not slow'"
