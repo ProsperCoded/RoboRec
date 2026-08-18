@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Literal, Union
+from typing import Literal
 
 from robo_rec.recovery.exceptions import InvalidSpecError
 
