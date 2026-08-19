@@ -40,3 +40,23 @@ def test_verify_address_is_case_insensitive_for_eth():
     eth_address = addresses[0].address
     match = verify_address(MNEMONIC, eth_address.upper(), coin=SupportedCoin.ETHEREUM)
     assert match is not None
+
+
+def test_derive_addresses_solana_matches_btcrecover_verification_path():
+    # Matches py_crypto_hd_wallet's HdWalletBip44Coins.SOLANA output, which is the exact
+    # library/path vendor/btcrecover's WalletSolana._verify_seed() uses internally — this
+    # is deliberately NOT bip_utils' own shallower DeriveDefaultPath() output (a different,
+    # incompatible address), confirmed by direct comparison in this session.
+    addresses = derive_addresses(MNEMONIC, coin=SupportedCoin.SOLANA)
+    assert len(addresses) == 1
+    solana = addresses[0]
+    assert solana.path_type == "solana"
+    assert solana.derivation_path == "m/44'/501'/0'/0'/0'"
+    assert solana.address == "D1V72D3pMJRVW5w7G6TTdST6ZtnE2e8gaMeihQU7zoW1"
+
+
+def test_verify_address_finds_solana_match():
+    addresses = derive_addresses(MNEMONIC, coin=SupportedCoin.SOLANA)
+    match = verify_address(MNEMONIC, addresses[0].address, coin=SupportedCoin.SOLANA)
+    assert match is not None
+    assert match.path_type == "solana"

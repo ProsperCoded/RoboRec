@@ -61,8 +61,7 @@ class Dashboard(QWidget):
         derive_wallet_card = ActionCard(
             "key",
             "Get Wallet from Seed Phrase",
-            "Phrase is complete and correct. Derive its public address and "
-            "private key.",
+            "Phrase is complete and correct. Derive and verify its public address.",
         )
         derive_wallet_card.clicked.connect(
             lambda: self.action_selected.emit(ACTION_DERIVE_WALLET)

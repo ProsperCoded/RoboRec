@@ -1,7 +1,8 @@
-"""Get Wallet from Seed Phrase panel — UI shell only, purely local mock result.
+"""Get Wallet from Seed Phrase panel — wired to robo_rec.derivation.
 
 Mirrors PRD 4.4: derive addresses across standard paths, optionally verify
-against a target address.
+against a target address. No private key is ever derived or displayed —
+PRD 4.4 only specifies address derivation/verification.
 """
 
 from __future__ import annotations
@@ -12,23 +13,23 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
 )
 
+from robo_rec.derivation import derive_addresses, verify_address
+from robo_rec.gui.coin_options import COIN_OPTION_LABELS, UNSUPPORTED_COIN_MESSAGE, coin_for_label
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.widgets.seed_row import SeedRow
-
-MOCK_ADDRESS = "1FMHvVtJkJFnSxaN9KUn5q3KtqNwej1sZ6"
-MOCK_PRIVATE_KEY = "•" * 52
+from robo_rec.util.mnemonic import is_valid_mnemonic
 
 
 class DeriveWalletPanel(BasePanel):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Get Wallet from Seed Phrase",
-            "Enter your complete, correctly-ordered phrase to derive its "
-            "public address and private key.",
+            "Enter your complete, correctly-ordered phrase to derive its public address.",
             parent,
         )
 
@@ -46,7 +47,7 @@ class DeriveWalletPanel(BasePanel):
         token_group = QGroupBox("Token")
         token_layout = QHBoxLayout(token_group)
         self._token_combo = QComboBox()
-        self._token_combo.addItems(["Bitcoin (BTC)", "Ethereum (ETH)", "Other BIP39-compatible"])
+        self._token_combo.addItems(list(COIN_OPTION_LABELS))
         token_layout.addWidget(self._token_combo)
         options_row.addWidget(token_group)
 
@@ -71,46 +72,88 @@ class DeriveWalletPanel(BasePanel):
         self._derive_button.clicked.connect(self._on_derive_clicked)
         self.root_layout.addWidget(self._derive_button)
 
-        self._result_group = QGroupBox("Result (sample — not yet wired to real derivation)")
-        result_layout = QVBoxLayout(self._result_group)
-
-        address_row = QHBoxLayout()
-        address_row.addWidget(QLabel("Address:"))
-        self._address_result = QLabel(MOCK_ADDRESS)
-        self._address_result.setObjectName("SeedTileWord")
-        address_row.addWidget(self._address_result)
-        address_row.addStretch(1)
-        result_layout.addLayout(address_row)
-
-        key_row = QHBoxLayout()
-        key_row.addWidget(QLabel("Private key:"))
-        self._key_result = QLabel(MOCK_PRIVATE_KEY)
-        self._key_result.setObjectName("SeedTileWord")
-        key_row.addWidget(self._key_result)
-        self._reveal_button = QPushButton("Reveal")
-        self._reveal_button.clicked.connect(self._on_reveal_clicked)
-        key_row.addWidget(self._reveal_button)
-        key_row.addStretch(1)
-        result_layout.addLayout(key_row)
-
+        self._result_group = QGroupBox("Derived addresses")
+        self._result_layout = QVBoxLayout(self._result_group)
         self._result_group.setVisible(False)
         self.root_layout.addWidget(self._result_group)
 
         self.root_layout.addStretch(1)
-        self._revealed = False
 
     def _on_length_changed(self) -> None:
         length = 12 if self._length_combo.currentIndex() == 0 else 24
         self._seed_row.set_length(length)
 
     def _on_derive_clicked(self) -> None:
+        words = self._seed_row.words()
+        if any(not w for w in words):
+            QMessageBox.warning(
+                self,
+                "Complete phrase required",
+                "Derivation needs every word filled in — this panel is for complete, "
+                "correctly-ordered phrases. Use Missing Words or Scrambled Seed Phrase "
+                "first if the phrase isn't complete yet.",
+            )
+            return
+
+        mnemonic = " ".join(words)
+        if not is_valid_mnemonic(mnemonic):
+            QMessageBox.warning(
+                self,
+                "Invalid phrase",
+                "This phrase doesn't pass BIP39 checksum validation — check for typos, "
+                "or use the Missing Words / Scrambled Seed Phrase tools if you're not "
+                "certain it's correct.",
+            )
+            return
+
+        coin = coin_for_label(self._token_combo.currentText())
+        if coin is None:
+            QMessageBox.warning(self, "Unsupported token", UNSUPPORTED_COIN_MESSAGE)
+            return
+
+        target = self._address_field.text().strip()
+
+        while self._result_layout.count():
+            item = self._result_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if target:
+            match = verify_address(mnemonic, target, coin=coin)
+            if match is not None:
+                self._add_result_row(
+                    f"✓ Verified match — {match.wallet_software_label}",
+                    match.address,
+                    match.derivation_path,
+                )
+            else:
+                self._add_result_row(
+                    "✗ No match found in the standard address range for this token",
+                    target,
+                    None,
+                )
+        else:
+            for derived in derive_addresses(mnemonic, coin=coin):
+                self._add_result_row(derived.wallet_software_label, derived.address, derived.derivation_path)
+
         self._result_group.setVisible(True)
 
-    def _on_reveal_clicked(self) -> None:
-        self._revealed = not self._revealed
-        if self._revealed:
-            self._key_result.setText("Kx7f2m9pQ8VnR1TzW6xJhLd3sYb4NcAe5uGoP2iMk9RtFqW8vXzD")
-            self._reveal_button.setText("Hide")
-        else:
-            self._key_result.setText(MOCK_PRIVATE_KEY)
-            self._reveal_button.setText("Reveal")
+    def _add_result_row(self, label: str, address: str, path: str | None) -> None:
+        row = QVBoxLayout()
+        label_widget = QLabel(label)
+        label_widget.setObjectName("SectionLabel")
+        row.addWidget(label_widget)
+
+        address_row = QHBoxLayout()
+        address_field = QLineEdit(address)
+        address_field.setReadOnly(True)
+        address_field.setObjectName("SeedTileWord")
+        address_row.addWidget(address_field, stretch=1)
+        row.addLayout(address_row)
+
+        if path:
+            path_label = QLabel(f"Path: {path}")
+            path_label.setObjectName("InfoNotice")
+            row.addWidget(path_label)
+
+        self._result_layout.addLayout(row)

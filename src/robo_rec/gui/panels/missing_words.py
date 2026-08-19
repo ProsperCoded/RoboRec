@@ -1,4 +1,4 @@
-"""Missing Words panel — UI shell only, no subprocess wiring yet.
+"""Missing Words panel — wired to robo_rec.recovery via RecoveryWorker.
 
 Single unified flow per the user's sketch: paste/type the words you know in
 order, leave boxes blank for the ones you don't. A "do you know the exact
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
@@ -27,11 +28,21 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from robo_rec.gui.coin_options import (
+    COIN_OPTION_LABELS,
+    UNSUPPORTED_COIN_MESSAGE,
+    coin_for_label,
+    detect_coin_label,
+    wallet_type_for_coin,
+)
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
+from robo_rec.gui.recovery_worker import RecoveryWorker
 from robo_rec.gui.theme import ACCENT
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
 from robo_rec.gui.widgets.seed_row import SeedRow
+from robo_rec.recovery.exceptions import InvalidSpecError
+from robo_rec.recovery.models import MissingWordKnownPositionSpec, MissingWordUnknownPositionSpec
 
 KNOWN_POSITION_MAX = 4
 UNKNOWN_POSITION_MAX = 2
@@ -50,13 +61,6 @@ UNKNOWN_POSITION_OVER_LIMIT = (
 # Illustrative combinations-per-minute rate for the estimate shown before a run;
 # not a measured benchmark — real timing depends on hardware and GPU availability.
 COMBINATIONS_PER_MINUTE = 2_000_000
-
-TOKEN_PREFIXES = {
-    "1": "Bitcoin (BTC)",
-    "3": "Bitcoin (BTC)",
-    "bc1": "Bitcoin (BTC)",
-    "0x": "Ethereum (ETH)",
-}
 
 
 def estimate_minutes(total_words: int, missing: int, *, known_position: bool) -> float:
@@ -79,14 +83,6 @@ def format_estimate(minutes: float) -> str:
     return f"~{hours / 24:.1f} days"
 
 
-def detect_token(address: str) -> str | None:
-    address = address.strip()
-    for prefix, token in TOKEN_PREFIXES.items():
-        if address.startswith(prefix):
-            return token
-    return None
-
-
 class MissingWordsPanel(BasePanel):
     def __init__(self, parent=None) -> None:
         super().__init__(
@@ -96,6 +92,8 @@ class MissingWordsPanel(BasePanel):
             parent,
         )
 
+        self._worker: RecoveryWorker | None = None
+
         self._view_stack = AnimatedStackedWidget()
         self.root_layout.addWidget(self._view_stack, stretch=1)
 
@@ -103,10 +101,9 @@ class MissingWordsPanel(BasePanel):
         self._view_stack.addWidget(self._build_loading_view())
         self._view_stack.addWidget(self._build_result_view())
 
-        self._progress_timer = QTimer(self)
-        self._progress_timer.setInterval(180)
-        self._progress_timer.timeout.connect(self._advance_progress)
-        self._progress_value = 0
+        self._spinner_timer = QTimer(self)
+        self._spinner_timer.setInterval(180)
+        self._spinner_timer.timeout.connect(self._advance_spinner)
         self._loading_rotation = 0
 
         self._refresh_missing_count()
@@ -172,7 +169,7 @@ class MissingWordsPanel(BasePanel):
         self._address_field.textChanged.connect(self._on_address_changed)
         target_layout.addWidget(self._address_field, stretch=1)
         self._token_combo = QComboBox()
-        self._token_combo.addItems(["Bitcoin (BTC)", "Ethereum (ETH)", "Solana (SOL)", "Other BIP39-compatible"])
+        self._token_combo.addItems(list(COIN_OPTION_LABELS))
         target_layout.addWidget(self._token_combo)
         layout.addWidget(target_group)
 
@@ -215,10 +212,19 @@ class MissingWordsPanel(BasePanel):
         layout.addWidget(self._loading_subtitle)
 
         self._progress_bar = QProgressBar()
-        self._progress_bar.setRange(0, 100)
+        self._progress_bar.setRange(0, 0)  # indeterminate — btcrecover has no fine-grained
         self._progress_bar.setTextVisible(False)
         self._progress_bar.setFixedHeight(8)
         layout.addWidget(self._progress_bar)
+
+        self._phase_label = QLabel()
+        self._phase_label.setObjectName("InfoNotice")
+        self._phase_label.setWordWrap(True)
+        layout.addWidget(self._phase_label)
+
+        cancel_button = QPushButton("Cancel Search")
+        cancel_button.clicked.connect(self._on_cancel_clicked)
+        layout.addWidget(cancel_button)
 
         layout.addStretch(2)
         return view
@@ -234,18 +240,18 @@ class MissingWordsPanel(BasePanel):
 
         title_row = QHBoxLayout()
         title_row.setSpacing(10)
-        result_icon = QLabel()
-        result_icon.setPixmap(load_pixmap("party-popper", ACCENT, 22))
-        title_row.addWidget(result_icon)
-        title = QLabel("Recovered your seed phrase")
-        title.setObjectName("DashboardTitle")
-        title_row.addWidget(title)
+        self._result_icon = QLabel()
+        title_row.addWidget(self._result_icon)
+        self._result_title = QLabel()
+        self._result_title.setObjectName("DashboardTitle")
+        title_row.addWidget(self._result_title)
         title_row.addStretch(1)
         layout.addLayout(title_row)
 
-        subtitle = QLabel("Every word below matches a valid, address-verified phrase.")
-        subtitle.setObjectName("DashboardSubtitle")
-        layout.addWidget(subtitle)
+        self._result_subtitle = QLabel()
+        self._result_subtitle.setObjectName("DashboardSubtitle")
+        self._result_subtitle.setWordWrap(True)
+        layout.addWidget(self._result_subtitle)
 
         self._result_row = SeedRow(length=12, editable=False)
         layout.addWidget(self._result_row)
@@ -265,7 +271,7 @@ class MissingWordsPanel(BasePanel):
         self._refresh_missing_count()
 
     def _on_address_changed(self, text: str) -> None:
-        detected = detect_token(text)
+        detected = detect_coin_label(text)
         if detected:
             index = self._token_combo.findText(detected)
             if index >= 0:
@@ -308,32 +314,111 @@ class MissingWordsPanel(BasePanel):
         self._start_button.setEnabled(0 < missing <= limit)
 
     def _on_proceed_clicked(self) -> None:
-        missing = self._seed_row.missing_count()
-        known_position = self._known_radio.isChecked()
-        minutes = estimate_minutes(len(self._seed_row.tiles()), missing, known_position=known_position)
-        self._loading_subtitle.setText(f"Estimated time: {format_estimate(minutes)}. This is a preview run.")
-        self._progress_value = 0
-        self._progress_bar.setValue(0)
-        self._view_stack.setCurrentIndex(1)
-        self._progress_timer.start()
+        address = self._address_field.text().strip()
+        if not address:
+            QMessageBox.warning(
+                self,
+                "Test address required",
+                "Robo-Rec needs an address to verify candidate phrases against before "
+                "it can search. Enter an address you know is associated with this wallet.",
+            )
+            return
 
-    def _advance_progress(self) -> None:
-        self._progress_value = min(self._progress_value + 7, 100)
-        self._progress_bar.setValue(self._progress_value)
+        coin = coin_for_label(self._token_combo.currentText())
+        if coin is None:
+            QMessageBox.warning(self, "Unsupported token", UNSUPPORTED_COIN_MESSAGE)
+            return
+
+        words = self._seed_row.words()
+        known_position = self._known_radio.isChecked()
+        wallet_type = wallet_type_for_coin(coin)
+
+        try:
+            if known_position:
+                spec = MissingWordKnownPositionSpec(
+                    words=[w or None for w in words],
+                    wallet_type=wallet_type,
+                    addrs=[address],
+                )
+            else:
+                spec = MissingWordUnknownPositionSpec(
+                    words=[w for w in words if w],
+                    full_length=len(words),
+                    wallet_type=wallet_type,
+                    addrs=[address],
+                )
+        except InvalidSpecError as exc:
+            QMessageBox.warning(self, "Can't start this search", str(exc))
+            return
+
+        minutes = estimate_minutes(len(words), self._seed_row.missing_count(), known_position=known_position)
+        self._loading_subtitle.setText(f"Estimated time: {format_estimate(minutes)}.")
+        self._phase_label.setText("")
+        self._view_stack.setCurrentIndex(1)
+        self._start_search(spec)
+
+    def _start_search(self, spec) -> None:
+        self._worker = RecoveryWorker(spec)
+        self._worker.event.connect(self._on_recovery_event)
+        self._worker.finished.connect(self._on_recovery_finished)
+        self._worker.failed.connect(self._on_recovery_failed)
+        self._worker.start()
+        self._loading_rotation = 0
+        self._spinner_timer.start()
+
+    def _on_cancel_clicked(self) -> None:
+        if self._worker is not None:
+            self._worker.cancel()
+
+    def _advance_spinner(self) -> None:
         self._loading_rotation = (self._loading_rotation + 30) % 360
         pixmap = load_pixmap("loader-circle", ACCENT, 22)
         transform = QTransform().rotate(self._loading_rotation)
         self._loading_icon.setPixmap(
             pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)
         )
-        if self._progress_value >= 100:
-            self._progress_timer.stop()
-            self._show_result()
 
-    def _show_result(self) -> None:
-        self._result_row.set_length(len(self._seed_row.tiles()))
-        placeholder_words = [word or "found" for word in self._seed_row.words()]
-        self._result_row.set_words(placeholder_words)
+    def _on_recovery_event(self, event) -> None:
+        if event.kind == "phase":
+            self._phase_label.setText(event.message)
+        elif event.kind == "eta":
+            self._loading_subtitle.setText(event.message)
+
+    def _on_recovery_finished(self, result) -> None:
+        self._spinner_timer.stop()
+        self._cleanup_worker()
+        self._show_result(result)
+
+    def _on_recovery_failed(self, message: str) -> None:
+        self._spinner_timer.stop()
+        self._cleanup_worker()
+        self._view_stack.setCurrentIndex(0)
+        QMessageBox.critical(self, "Recovery failed to start", message)
+
+    def _cleanup_worker(self) -> None:
+        if self._worker is not None:
+            self._worker.wait_and_cleanup()
+            self._worker = None
+
+    def _show_result(self, result) -> None:
+        if result.succeeded and result.mnemonic:
+            self._result_icon.setPixmap(load_pixmap("party-popper", ACCENT, 22))
+            self._result_title.setText("Recovered your seed phrase")
+            self._result_subtitle.setText(
+                "Every word below matches a valid, address-verified phrase."
+            )
+            words = result.mnemonic.split()
+            self._result_row.set_length(len(words))
+            self._result_row.set_words(words)
+        else:
+            self._result_icon.setPixmap(load_pixmap("loader-circle", ACCENT, 22))
+            self._result_title.setText("No matching phrase found")
+            self._result_subtitle.setText(
+                "Robo-Rec searched every combination in this range and none matched the "
+                "test address. Double-check the address and the words you entered."
+            )
+            self._result_row.set_length(len(self._seed_row.tiles()))
+            self._result_row.set_words(self._seed_row.words())
         self._view_stack.setCurrentIndex(2)
 
     def _reset_to_form(self) -> None:
