@@ -40,7 +40,7 @@ def test_gpu_badge_reflects_status(qtbot):
     qtbot.addWidget(window)
 
     window.set_gpu_status(detected=True)
-    assert window._gpu_badge.text() == "GPU Detected"
+    assert window._gpu_badge_text.text() == "GPU Detected"
 
     window.set_gpu_status(detected=False)
-    assert window._gpu_badge.text() == "CPU Only"
+    assert window._gpu_badge_text.text() == "CPU Only"

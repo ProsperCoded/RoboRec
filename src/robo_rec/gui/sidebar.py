@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+
+from robo_rec.gui.icons import load_icon
+from robo_rec.gui.theme import ACCENT, TEXT_SECONDARY
 
 SIDEBAR_WIDTH = 200
 
@@ -31,8 +34,13 @@ class Sidebar(QWidget):
         layout.addWidget(nav_label)
         layout.addSpacing(4)
 
-        self._actions_tab = QPushButton("  ⚑   Actions")
+        self._icon_active = load_icon("flag", ACCENT, 16)
+        self._icon_inactive = load_icon("flag", TEXT_SECONDARY, 16)
+
+        self._actions_tab = QPushButton("  Actions")
         self._actions_tab.setObjectName("SidebarNavItem")
+        self._actions_tab.setIcon(self._icon_active)
+        self._actions_tab.setIconSize(QSize(16, 16))
         self._actions_tab.setCheckable(True)
         self._actions_tab.setChecked(True)
         self._actions_tab.setFixedHeight(40)
@@ -45,3 +53,4 @@ class Sidebar(QWidget):
 
     def set_active(self, active: bool) -> None:
         self._actions_tab.setChecked(active)
+        self._actions_tab.setIcon(self._icon_active if active else self._icon_inactive)

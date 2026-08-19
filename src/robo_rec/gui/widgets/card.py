@@ -5,6 +5,9 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
+from robo_rec.gui.icons import load_pixmap
+from robo_rec.gui.theme import ACCENT
+
 
 class ActionCard(QWidget):
     """A single selectable action on the dashboard (Missing Words, etc.)."""
@@ -13,7 +16,7 @@ class ActionCard(QWidget):
 
     def __init__(
         self,
-        glyph: str,
+        icon_name: str,
         title: str,
         description: str,
         parent: QWidget | None = None,
@@ -28,9 +31,10 @@ class ActionCard(QWidget):
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(10)
 
-        glyph_label = QLabel(glyph)
-        glyph_label.setObjectName("CardGlyph")
-        layout.addWidget(glyph_label)
+        icon_label = QLabel()
+        icon_label.setObjectName("CardGlyph")
+        icon_label.setPixmap(load_pixmap(icon_name, ACCENT, 22))
+        layout.addWidget(icon_label)
 
         title_label = QLabel(title)
         title_label.setObjectName("CardTitle")

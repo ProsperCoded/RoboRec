@@ -68,6 +68,10 @@ QMainWindow, #ContentArea {{
     border: 1px solid {BORDER_STRONG};
 }}
 
+#SidebarNavItem:pressed {{
+    background-color: {ACCENT_DIM};
+}}
+
 /* ---- Top status bar ---- */
 #TopBar {{
     background-color: {BG};
@@ -82,7 +86,10 @@ QMainWindow, #ContentArea {{
 
 #GpuBadge {{
     border-radius: 11px;
-    padding: 4px 12px;
+}}
+
+#GpuBadge QLabel {{
+    background: transparent;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.5px;
@@ -90,14 +97,20 @@ QMainWindow, #ContentArea {{
 
 #GpuBadge[state="detected"] {{
     background-color: {ACCENT_DIM};
-    color: {ACCENT};
     border: 1px solid {ACCENT};
+}}
+
+#GpuBadge[state="detected"] QLabel {{
+    color: {ACCENT};
 }}
 
 #GpuBadge[state="unavailable"] {{
     background-color: {SURFACE_RAISED};
-    color: {TEXT_SECONDARY};
     border: 1px solid {BORDER_STRONG};
+}}
+
+#GpuBadge[state="unavailable"] QLabel {{
+    color: {TEXT_SECONDARY};
 }}
 
 /* ---- Dashboard ---- */
@@ -136,8 +149,7 @@ ActionCard:hover {{
 }}
 
 #CardGlyph {{
-    font-size: 20px;
-    color: {ACCENT};
+    background: transparent;
 }}
 
 /* ---- Panels ---- */
@@ -198,13 +210,26 @@ SeedTile {{
     border-radius: 6px;
 }}
 
+SeedTile:hover {{
+    border: 1px solid {BORDER_STRONG};
+    background-color: {SURFACE};
+}}
+
 SeedTile[filled="true"] {{
     border: 1px solid {BORDER_STRONG};
+}}
+
+SeedTile[filled="true"]:hover {{
+    border: 1px solid {ACCENT};
 }}
 
 SeedTile[blank="true"] {{
     border: 1px dashed {WARNING};
     background-color: {WARNING_DIM};
+}}
+
+SeedTile[blank="true"]:hover {{
+    border: 1px solid {WARNING};
 }}
 
 #SeedTileIndex {{
@@ -231,6 +256,10 @@ QComboBox, QLineEdit, QSpinBox {{
     selection-background-color: {ACCENT_DIM};
 }}
 
+QComboBox:hover, QLineEdit:hover, QSpinBox:hover {{
+    border: 1px solid {BORDER_STRONG};
+}}
+
 QComboBox:focus, QLineEdit:focus, QSpinBox:focus {{
     border: 1px solid {ACCENT};
 }}
@@ -240,9 +269,21 @@ QComboBox::drop-down {{
     width: 20px;
 }}
 
+QComboBox QAbstractItemView {{
+    background-color: {SURFACE_RAISED};
+    border: 1px solid {BORDER_STRONG};
+    selection-background-color: {ACCENT_DIM};
+    selection-color: {ACCENT};
+    outline: none;
+}}
+
 QRadioButton, QCheckBox {{
     color: {TEXT_PRIMARY};
     spacing: 8px;
+}}
+
+QRadioButton:hover, QCheckBox:hover {{
+    color: {ACCENT};
 }}
 
 /* ---- Buttons ---- */
@@ -257,11 +298,17 @@ QPushButton {{
 
 QPushButton:hover {{
     border: 1px solid {ACCENT};
+    background-color: {SURFACE};
+}}
+
+QPushButton:pressed {{
+    background-color: {ACCENT_DIM};
 }}
 
 QPushButton:disabled {{
     color: {TEXT_MUTED};
     border: 1px solid {BORDER};
+    background-color: {SURFACE_RAISED};
 }}
 
 QPushButton#PrimaryButton {{
@@ -275,10 +322,19 @@ QPushButton#PrimaryButton:hover {{
     color: {SIDEBAR};
 }}
 
+QPushButton#PrimaryButton:pressed {{
+    background-color: {ACCENT};
+    border: 1px solid {TEXT_PRIMARY};
+}}
+
 QPushButton#PrimaryButton:disabled {{
     background-color: {SURFACE_RAISED};
     border: 1px solid {BORDER};
     color: {TEXT_MUTED};
+}}
+
+#BreadcrumbButton:pressed {{
+    color: {ACCENT};
 }}
 
 /* ---- Notices ---- */

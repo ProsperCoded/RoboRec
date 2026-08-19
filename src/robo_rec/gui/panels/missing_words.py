@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QTransform
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -22,12 +23,14 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QRadioButton,
-    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
+from robo_rec.gui.theme import ACCENT
+from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
 from robo_rec.gui.widgets.seed_row import SeedRow
 
 KNOWN_POSITION_MAX = 4
@@ -93,7 +96,7 @@ class MissingWordsPanel(BasePanel):
             parent,
         )
 
-        self._view_stack = QStackedWidget()
+        self._view_stack = AnimatedStackedWidget()
         self.root_layout.addWidget(self._view_stack, stretch=1)
 
         self._view_stack.addWidget(self._build_form_view())
@@ -104,6 +107,7 @@ class MissingWordsPanel(BasePanel):
         self._progress_timer.setInterval(180)
         self._progress_timer.timeout.connect(self._advance_progress)
         self._progress_value = 0
+        self._loading_rotation = 0
 
         self._refresh_missing_count()
 
@@ -195,9 +199,16 @@ class MissingWordsPanel(BasePanel):
         layout.setSpacing(16)
         layout.addStretch(1)
 
+        title_row = QHBoxLayout()
+        title_row.setSpacing(10)
+        self._loading_icon = QLabel()
+        self._loading_icon.setPixmap(load_pixmap("loader-circle", ACCENT, 22))
+        title_row.addWidget(self._loading_icon)
         title = QLabel("Searching for your seed phrase…")
         title.setObjectName("DashboardTitle")
-        layout.addWidget(title)
+        title_row.addWidget(title)
+        title_row.addStretch(1)
+        layout.addLayout(title_row)
 
         self._loading_subtitle = QLabel()
         self._loading_subtitle.setObjectName("DashboardSubtitle")
@@ -221,9 +232,16 @@ class MissingWordsPanel(BasePanel):
         layout.setSpacing(16)
         layout.addStretch(1)
 
-        title = QLabel("🎉 Recovered your seed phrase")
+        title_row = QHBoxLayout()
+        title_row.setSpacing(10)
+        result_icon = QLabel()
+        result_icon.setPixmap(load_pixmap("party-popper", ACCENT, 22))
+        title_row.addWidget(result_icon)
+        title = QLabel("Recovered your seed phrase")
         title.setObjectName("DashboardTitle")
-        layout.addWidget(title)
+        title_row.addWidget(title)
+        title_row.addStretch(1)
+        layout.addLayout(title_row)
 
         subtitle = QLabel("Every word below matches a valid, address-verified phrase.")
         subtitle.setObjectName("DashboardSubtitle")
@@ -302,6 +320,12 @@ class MissingWordsPanel(BasePanel):
     def _advance_progress(self) -> None:
         self._progress_value = min(self._progress_value + 7, 100)
         self._progress_bar.setValue(self._progress_value)
+        self._loading_rotation = (self._loading_rotation + 30) % 360
+        pixmap = load_pixmap("loader-circle", ACCENT, 22)
+        transform = QTransform().rotate(self._loading_rotation)
+        self._loading_icon.setPixmap(
+            pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)
+        )
         if self._progress_value >= 100:
             self._progress_timer.stop()
             self._show_result()

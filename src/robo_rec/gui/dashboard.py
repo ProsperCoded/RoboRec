@@ -37,7 +37,7 @@ class Dashboard(QWidget):
         cards_row.setSpacing(18)
 
         missing_words_card = ActionCard(
-            "⌗",
+            "hash",
             "Missing Words",
             "One or more words are blank or illegible. Recover them from the "
             "rest of the phrase.",
@@ -48,7 +48,7 @@ class Dashboard(QWidget):
         cards_row.addWidget(missing_words_card)
 
         rearrange_card = ActionCard(
-            "⇄",
+            "shuffle",
             "Scrambled Seed Phrase",
             "All the words are correct but out of order. Find the correct "
             "arrangement.",
@@ -59,7 +59,7 @@ class Dashboard(QWidget):
         cards_row.addWidget(rearrange_card)
 
         derive_wallet_card = ActionCard(
-            "🔑",
+            "key",
             "Get Wallet from Seed Phrase",
             "Phrase is complete and correct. Derive its public address and "
             "private key.",

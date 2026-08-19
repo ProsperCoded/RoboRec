@@ -2,14 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
 
 from robo_rec.gui.dashboard import (
     ACTION_DERIVE_WALLET,
@@ -17,11 +10,13 @@ from robo_rec.gui.dashboard import (
     ACTION_REARRANGE,
     Dashboard,
 )
+from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.derive_wallet import DeriveWalletPanel
 from robo_rec.gui.panels.missing_words import MissingWordsPanel
 from robo_rec.gui.panels.rearrange import RearrangePanel
 from robo_rec.gui.sidebar import Sidebar
-from robo_rec.gui.theme import STYLESHEET
+from robo_rec.gui.theme import ACCENT, STYLESHEET, TEXT_SECONDARY
+from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
 
 
 class MainWindow(QMainWindow):
@@ -50,7 +45,7 @@ class MainWindow(QMainWindow):
 
         content_layout.addWidget(self._build_top_bar())
 
-        self._stack = QStackedWidget()
+        self._stack = AnimatedStackedWidget()
         content_layout.addWidget(self._stack, stretch=1)
 
         self._dashboard = Dashboard()
@@ -89,8 +84,15 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
         layout.addStretch(1)
 
-        self._gpu_badge = QLabel()
+        self._gpu_badge = QWidget()
         self._gpu_badge.setObjectName("GpuBadge")
+        badge_layout = QHBoxLayout(self._gpu_badge)
+        badge_layout.setContentsMargins(12, 4, 12, 4)
+        badge_layout.setSpacing(6)
+        self._gpu_badge_icon = QLabel()
+        badge_layout.addWidget(self._gpu_badge_icon)
+        self._gpu_badge_text = QLabel()
+        badge_layout.addWidget(self._gpu_badge_text)
         layout.addWidget(self._gpu_badge)
 
         self.set_gpu_status(detected=False)
@@ -98,7 +100,9 @@ class MainWindow(QMainWindow):
 
     def set_gpu_status(self, *, detected: bool) -> None:
         """Update the GPU badge. Detection wiring lands with the GPU status panel."""
-        self._gpu_badge.setText("GPU Detected" if detected else "CPU Only")
+        color = ACCENT if detected else TEXT_SECONDARY
+        self._gpu_badge_icon.setPixmap(load_pixmap("cpu", color, 14))
+        self._gpu_badge_text.setText("GPU Detected" if detected else "CPU Only")
         self._gpu_badge.setProperty("state", "detected" if detected else "unavailable")
         self._gpu_badge.style().unpolish(self._gpu_badge)
         self._gpu_badge.style().polish(self._gpu_badge)
