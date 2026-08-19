@@ -1,20 +1,16 @@
-"""Missing Words panel — wired to robo_rec.recovery via RecoveryWorker.
+"""Typo Correction panel — wired to robo_rec.recovery via RecoveryWorker.
 
-Single unified flow per the user's sketch: paste/type the words you know in
-order, leave boxes blank for the ones you don't. A "do you know the exact
-position of each blank" toggle decides how the engine will search (mirrors
-PRD 4.2: known positions support 1-4 missing words; unknown positions support
-only 1-2, since combinatorics make 3+ unknown-position infeasible).
+Mirrors PRD 4.3: enter a complete phrase you believe is correct but might
+contain individual typos or slightly-wrong words, and Robo-Rec's typo engine
+searches nearby spellings (and, if needed, entirely different words) for a
+combination that verifies against your address.
 """
 
 from __future__ import annotations
 
-import math
-
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QTransform
 from PySide6.QtWidgets import (
-    QButtonGroup,
     QComboBox,
     QGroupBox,
     QHBoxLayout,
@@ -23,7 +19,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QRadioButton,
     QVBoxLayout,
     QWidget,
 )
@@ -42,53 +37,15 @@ from robo_rec.gui.theme import ACCENT
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
 from robo_rec.gui.widgets.seed_row import SeedRow
 from robo_rec.recovery.exceptions import InvalidSpecError
-from robo_rec.recovery.models import MissingWordKnownPositionSpec, MissingWordUnknownPositionSpec
-
-KNOWN_POSITION_MAX = 4
-UNKNOWN_POSITION_MAX = 2
-
-KNOWN_POSITION_WARNINGS = {
-    3: "3 missing words at known positions can take hours; faster with a GPU.",
-    4: "4 missing words at known positions may take hours to days. GPU is "
-    "strongly recommended before starting.",
-}
-UNKNOWN_POSITION_OVER_LIMIT = (
-    "Robo-Rec can only search unknown positions for 1-2 missing words — beyond "
-    "that the number of possible arrangements is infeasible to check. Mark the "
-    "positions you do know, or reduce the number of blanks."
-)
-
-# Illustrative combinations-per-minute rate for the estimate shown before a run;
-# not a measured benchmark — real timing depends on hardware and GPU availability.
-COMBINATIONS_PER_MINUTE = 2_000_000
+from robo_rec.recovery.models import TypoCorrectionSpec
 
 
-def estimate_minutes(total_words: int, missing: int, *, known_position: bool) -> float:
-    if missing == 0:
-        return 0.0
-    combinations = 2048**missing
-    if not known_position:
-        combinations *= math.comb(total_words, missing)
-    return max(combinations / COMBINATIONS_PER_MINUTE, 0.1)
-
-
-def format_estimate(minutes: float) -> str:
-    if minutes < 1:
-        return "under a minute"
-    if minutes < 60:
-        return f"~{minutes:.0f} min"
-    hours = minutes / 60
-    if hours < 48:
-        return f"~{hours:.1f} hrs"
-    return f"~{hours / 24:.1f} days"
-
-
-class MissingWordsPanel(BasePanel):
+class TypoCorrectionPanel(BasePanel):
     def __init__(self, parent=None) -> None:
         super().__init__(
-            "Missing Words",
-            "Type or paste the words you know, in order. Leave a box blank "
-            "for each word you don't know.",
+            "Typo Correction",
+            "Enter your best-guess phrase, complete and in order — even if a word or "
+            "two might be slightly wrong. Robo-Rec checks nearby spellings first.",
             parent,
         )
 
@@ -106,8 +63,6 @@ class MissingWordsPanel(BasePanel):
         self._spinner_timer.timeout.connect(self._advance_spinner)
         self._loading_rotation = 0
 
-        self._refresh_missing_count()
-
     # ---- form view ----------------------------------------------------
 
     def _build_form_view(self) -> QWidget:
@@ -116,50 +71,19 @@ class MissingWordsPanel(BasePanel):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(18)
 
-        options_row = QHBoxLayout()
-        options_row.setSpacing(16)
-
         length_group = QGroupBox("Phrase length")
         length_layout = QHBoxLayout(length_group)
         self._length_combo = QComboBox()
         self._length_combo.addItems(["12 words", "24 words"])
         self._length_combo.currentIndexChanged.connect(self._on_length_changed)
         length_layout.addWidget(self._length_combo)
-        options_row.addWidget(length_group)
+        layout.addWidget(length_group)
 
-        position_group = QGroupBox("Do you know the position of each blank?")
-        position_layout = QHBoxLayout(position_group)
-        self._known_radio = QRadioButton("Yes, mark exact blanks")
-        self._known_radio.setChecked(True)
-        self._unknown_radio = QRadioButton("No, just missing somewhere")
-        position_group_btns = QButtonGroup(self)
-        position_group_btns.addButton(self._known_radio)
-        position_group_btns.addButton(self._unknown_radio)
-        self._known_radio.toggled.connect(self._refresh_missing_count)
-        position_layout.addWidget(self._known_radio)
-        position_layout.addWidget(self._unknown_radio)
-        options_row.addWidget(position_group, stretch=1)
-
-        layout.addLayout(options_row)
-
-        self._warning_label = QLabel()
-        self._warning_label.setObjectName("WarningNotice")
-        self._warning_label.setWordWrap(True)
-        self._warning_label.hide()
-        layout.addWidget(self._warning_label)
-
-        tiles_header = QHBoxLayout()
-        tiles_label = QLabel("PASTE ALL KNOWN WORDS, IN ORDER")
+        tiles_label = QLabel("YOUR BEST-GUESS PHRASE")
         tiles_label.setObjectName("SectionLabel")
-        tiles_header.addWidget(tiles_label)
-        tiles_header.addStretch(1)
-        self._missing_count_label = QLabel()
-        self._missing_count_label.setObjectName("SectionLabel")
-        tiles_header.addWidget(self._missing_count_label)
-        layout.addLayout(tiles_header)
+        layout.addWidget(tiles_label)
 
         self._seed_row = SeedRow(length=12, editable=True)
-        self._seed_row.words_changed.connect(self._refresh_missing_count)
         layout.addWidget(self._seed_row)
 
         target_group = QGroupBox("Test address")
@@ -173,13 +97,15 @@ class MissingWordsPanel(BasePanel):
         target_layout.addWidget(self._token_combo)
         layout.addWidget(target_group)
 
-        estimate_row = QHBoxLayout()
-        self._estimate_label = QLabel()
-        self._estimate_label.setObjectName("InfoNotice")
-        estimate_row.addWidget(self._estimate_label, stretch=1)
-        layout.addLayout(estimate_row)
+        info = QLabel(
+            "Robo-Rec first tries words that look similar to what you typed (a likely "
+            "misspelling), then falls back to trying entirely different words if needed."
+        )
+        info.setObjectName("InfoNotice")
+        info.setWordWrap(True)
+        layout.addWidget(info)
 
-        self._start_button = QPushButton("Proceed")
+        self._start_button = QPushButton("Start Search")
         self._start_button.setObjectName("PrimaryButton")
         self._start_button.clicked.connect(self._on_proceed_clicked)
         layout.addWidget(self._start_button)
@@ -201,7 +127,7 @@ class MissingWordsPanel(BasePanel):
         self._loading_icon = QLabel()
         self._loading_icon.setPixmap(load_pixmap("loader-circle", ACCENT, 22))
         title_row.addWidget(self._loading_icon)
-        title = QLabel("Searching for your seed phrase…")
+        title = QLabel("Checking for typos…")
         title.setObjectName("DashboardTitle")
         title_row.addWidget(title)
         title_row.addStretch(1)
@@ -212,7 +138,7 @@ class MissingWordsPanel(BasePanel):
         layout.addWidget(self._loading_subtitle)
 
         self._progress_bar = QProgressBar()
-        self._progress_bar.setRange(0, 0)  # indeterminate — btcrecover has no fine-grained
+        self._progress_bar.setRange(0, 0)
         self._progress_bar.setTextVisible(False)
         self._progress_bar.setFixedHeight(8)
         layout.addWidget(self._progress_bar)
@@ -256,7 +182,7 @@ class MissingWordsPanel(BasePanel):
         self._result_row = SeedRow(length=12, editable=False)
         layout.addWidget(self._result_row)
 
-        again_button = QPushButton("Start Another Recovery")
+        again_button = QPushButton("Start Another Search")
         again_button.clicked.connect(self._reset_to_form)
         layout.addWidget(again_button)
 
@@ -268,7 +194,6 @@ class MissingWordsPanel(BasePanel):
     def _on_length_changed(self) -> None:
         length = 12 if self._length_combo.currentIndex() == 0 else 24
         self._seed_row.set_length(length)
-        self._refresh_missing_count()
 
     def _on_address_changed(self, text: str) -> None:
         detected = detect_coin_label(text)
@@ -276,42 +201,6 @@ class MissingWordsPanel(BasePanel):
             index = self._token_combo.findText(detected)
             if index >= 0:
                 self._token_combo.setCurrentIndex(index)
-
-    def _refresh_missing_count(self) -> None:
-        missing = self._seed_row.missing_count()
-        total = len(self._seed_row.tiles())
-        known_position = self._known_radio.isChecked()
-
-        self._missing_count_label.setText(f"MISSING WORDS: {missing} (derived)")
-
-        limit = KNOWN_POSITION_MAX if known_position else UNKNOWN_POSITION_MAX
-        over_limit = missing > limit
-
-        warning = None
-        if over_limit and not known_position:
-            warning = UNKNOWN_POSITION_OVER_LIMIT
-        elif over_limit and known_position:
-            warning = (
-                f"{missing} missing words at known positions is beyond what Robo-Rec "
-                "supports (max 4). Fill in more words to continue."
-            )
-        elif known_position:
-            warning = KNOWN_POSITION_WARNINGS.get(missing)
-
-        if warning:
-            self._warning_label.setText(warning)
-            self._warning_label.show()
-        else:
-            self._warning_label.hide()
-
-        if missing == 0:
-            estimate_text = "Fill in at least one blank to see a time estimate."
-        else:
-            minutes = estimate_minutes(total, missing, known_position=known_position)
-            estimate_text = f"Estimated time: {format_estimate(minutes)} (based on {missing} missing word(s))"
-        self._estimate_label.setText(estimate_text)
-
-        self._start_button.setEnabled(0 < missing <= limit)
 
     def _on_proceed_clicked(self) -> None:
         address = self._address_field.text().strip()
@@ -330,34 +219,32 @@ class MissingWordsPanel(BasePanel):
             return
 
         words = self._seed_row.words()
-        known_position = self._known_radio.isChecked()
-        wallet_type = wallet_type_for_coin(coin)
+        if any(not w for w in words):
+            QMessageBox.warning(
+                self,
+                "Complete phrase required",
+                "Typo Correction is for complete phrases with possible mistakes — not "
+                "missing words. Use Missing Words if any tile is blank.",
+            )
+            return
 
+        wallet_type = wallet_type_for_coin(coin)
         try:
-            if known_position:
-                spec = MissingWordKnownPositionSpec(
-                    words=[w or None for w in words],
-                    wallet_type=wallet_type,
-                    addrs=[address],
-                )
-            else:
-                spec = MissingWordUnknownPositionSpec(
-                    words=[w for w in words if w],
-                    full_length=len(words),
-                    wallet_type=wallet_type,
-                    addrs=[address],
-                )
+            spec = TypoCorrectionSpec(
+                best_guess_mnemonic=" ".join(words),
+                wallet_type=wallet_type,
+                addrs=[address],
+            )
         except InvalidSpecError as exc:
             QMessageBox.warning(self, "Can't start this search", str(exc))
             return
 
-        minutes = estimate_minutes(len(words), self._seed_row.missing_count(), known_position=known_position)
-        self._loading_subtitle.setText(f"Estimated time: {format_estimate(minutes)}.")
+        self._loading_subtitle.setText("Checking nearby spellings first…")
         self._phase_label.setText("")
         self._view_stack.setCurrentIndex(1)
         self._start_search(spec)
 
-    def _start_search(self, spec) -> None:
+    def _start_search(self, spec: TypoCorrectionSpec) -> None:
         self._worker = RecoveryWorker(spec)
         self._worker.event.connect(self._on_recovery_event)
         self._worker.finished.connect(self._on_recovery_finished)
@@ -393,7 +280,7 @@ class MissingWordsPanel(BasePanel):
         self._spinner_timer.stop()
         self._cleanup_worker()
         self._view_stack.setCurrentIndex(0)
-        QMessageBox.critical(self, "Recovery failed to start", message)
+        QMessageBox.critical(self, "Search failed to start", message)
 
     def _cleanup_worker(self) -> None:
         if self._worker is not None:
@@ -410,7 +297,7 @@ class MissingWordsPanel(BasePanel):
     def _show_result(self, result) -> None:
         if result.succeeded and result.mnemonic:
             self._result_icon.setPixmap(load_pixmap("party-popper", ACCENT, 22))
-            self._result_title.setText("Recovered your seed phrase")
+            self._result_title.setText("Found the corrected phrase")
             self._result_subtitle.setText(
                 "Every word below matches a valid, address-verified phrase."
             )
@@ -419,10 +306,10 @@ class MissingWordsPanel(BasePanel):
             self._result_row.set_words(words)
         else:
             self._result_icon.setPixmap(load_pixmap("loader-circle", ACCENT, 22))
-            self._result_title.setText("No matching phrase found")
+            self._result_title.setText("No corrected phrase found")
             self._result_subtitle.setText(
-                "Robo-Rec searched every combination in this range and none matched the "
-                "test address. Double-check the address and the words you entered."
+                "Robo-Rec searched nearby spellings and word substitutions and none "
+                "matched the test address. Double-check the address and your phrase."
             )
             self._result_row.set_length(len(self._seed_row.tiles()))
             self._result_row.set_words(self._seed_row.words())
@@ -430,8 +317,3 @@ class MissingWordsPanel(BasePanel):
 
     def _reset_to_form(self) -> None:
         self._view_stack.setCurrentIndex(0)
-        self._seed_row.focus_first_blank()
-
-    def focus_first_word(self) -> None:
-        if self._view_stack.currentIndex() == 0:
-            self._seed_row.focus_first_blank()

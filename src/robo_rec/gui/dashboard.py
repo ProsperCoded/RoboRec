@@ -10,6 +10,7 @@ from robo_rec.gui.widgets.card import ActionCard
 ACTION_MISSING_WORDS = "missing_words"
 ACTION_REARRANGE = "rearrange"
 ACTION_DERIVE_WALLET = "derive_wallet"
+ACTION_TYPO_CORRECTION = "typo_correction"
 
 
 class Dashboard(QWidget):
@@ -67,6 +68,17 @@ class Dashboard(QWidget):
             lambda: self.action_selected.emit(ACTION_DERIVE_WALLET)
         )
         cards_row.addWidget(derive_wallet_card)
+
+        typo_correction_card = ActionCard(
+            "square-plus",
+            "Typo Correction",
+            "Phrase is complete but a word or two might be misspelled. Search "
+            "nearby spellings for the correct phrase.",
+        )
+        typo_correction_card.clicked.connect(
+            lambda: self.action_selected.emit(ACTION_TYPO_CORRECTION)
+        )
+        cards_row.addWidget(typo_correction_card)
 
         layout.addLayout(cards_row)
         layout.addStretch(1)

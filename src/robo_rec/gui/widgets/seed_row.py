@@ -21,10 +21,19 @@ class SeedRow(QWidget):
     """Lays out `length` SeedTiles in a grid, rebuildable when length changes."""
 
     words_changed = Signal()
+    locks_changed = Signal()
 
-    def __init__(self, length: int = 12, *, editable: bool = True, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        length: int = 12,
+        *,
+        editable: bool = True,
+        lockable: bool = False,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._editable = editable
+        self._lockable = lockable
         self._tiles: list[SeedTile] = []
         self._layout = QGridLayout(self)
         self._layout.setSpacing(8)
@@ -39,10 +48,11 @@ class SeedRow(QWidget):
                 item.widget().deleteLater()
         self._tiles = []
         for i in range(length):
-            tile = SeedTile(i, editable=self._editable)
+            tile = SeedTile(i, editable=self._editable, lockable=self._lockable)
             tile.word_changed.connect(lambda *_: self.words_changed.emit())
             tile.paste_overflow.connect(self._on_paste_overflow)
             tile.advance_requested.connect(self._on_advance_requested)
+            tile.lock_toggled.connect(lambda *_: self.locks_changed.emit())
             self._tiles.append(tile)
             self._layout.addWidget(tile, i // TILES_PER_ROW, i % TILES_PER_ROW)
         self.words_changed.emit()
@@ -59,6 +69,14 @@ class SeedRow(QWidget):
 
     def missing_count(self) -> int:
         return sum(1 for tile in self._tiles if tile.word() == "")
+
+    def locked_indices(self) -> list[int]:
+        return [tile.index for tile in self._tiles if tile.is_locked()]
+
+    def set_all_locked(self, locked: bool) -> None:
+        for tile in self._tiles:
+            tile.set_locked(locked)
+        self.locks_changed.emit()
 
     def focus_first_blank(self) -> None:
         for tile in self._tiles:

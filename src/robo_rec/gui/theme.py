@@ -232,10 +232,27 @@ SeedTile[blank="true"]:hover {{
     border: 1px solid {WARNING};
 }}
 
+SeedTile[locked="true"] {{
+    border: 1px solid {ACCENT};
+    background-color: {ACCENT_DIM};
+}}
+
 #SeedTileIndex {{
     font-family: {FONT_MONO};
     font-size: 9px;
     color: {TEXT_MUTED};
+}}
+
+#SeedTileLockButton {{
+    color: {TEXT_MUTED};
+    font-size: 10px;
+    border: none;
+    background: transparent;
+    padding: 0px;
+}}
+
+SeedTile[locked="true"] #SeedTileLockButton {{
+    color: {ACCENT};
 }}
 
 #SeedTileWord {{

@@ -10,7 +10,15 @@ Get Wallet from Seed Phrase.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QLabel, QLineEdit, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 BLANK_PLACEHOLDER = "····"
 
@@ -43,11 +51,18 @@ class _WordField(QLineEdit):
 
 
 class SeedTile(QWidget):
-    """A single seed-word slot: index label over an editable/read-only word field."""
+    """A single seed-word slot: index label over an editable/read-only word field.
+
+    When lockable=True (used by the Rearrange panel's 24-word known-correct-segment case),
+    a small lock toggle appears next to the index, letting the user mark this tile as
+    "this word is definitely in this position" vs. the default "somewhere in the scrambled
+    group". Locked state has no effect for panels that don't opt into it.
+    """
 
     word_changed = Signal(int, str)
     paste_overflow = Signal(int, list)
     advance_requested = Signal(int)
+    lock_toggled = Signal(int, bool)
 
     def __init__(
         self,
@@ -55,11 +70,13 @@ class SeedTile(QWidget):
         word: str = "",
         *,
         editable: bool = True,
+        lockable: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("SeedTile")
         self._index = index
+        self._locked = False
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.setFixedSize(112, 52)
 
@@ -67,9 +84,25 @@ class SeedTile(QWidget):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(2)
 
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(4)
         self._index_label = QLabel(f"{index + 1:02d}")
         self._index_label.setObjectName("SeedTileIndex")
-        layout.addWidget(self._index_label)
+        header_row.addWidget(self._index_label)
+        header_row.addStretch(1)
+
+        self._lock_button: QPushButton | None = None
+        if lockable:
+            self._lock_button = QPushButton("○")
+            self._lock_button.setObjectName("SeedTileLockButton")
+            self._lock_button.setFlat(True)
+            self._lock_button.setFixedSize(16, 16)
+            self._lock_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self._lock_button.setToolTip("Mark this word as definitely in this position")
+            self._lock_button.clicked.connect(self._on_lock_clicked)
+            header_row.addWidget(self._lock_button)
+        layout.addLayout(header_row)
 
         self._word_field = _WordField(index, word)
         self._word_field.setObjectName("SeedTileWord")
@@ -88,6 +121,10 @@ class SeedTile(QWidget):
         self.set_blank(text == "")
         self.word_changed.emit(self._index, text)
 
+    def _on_lock_clicked(self) -> None:
+        self.set_locked(not self._locked)
+        self.lock_toggled.emit(self._index, self._locked)
+
     @property
     def index(self) -> int:
         return self._index
@@ -100,6 +137,17 @@ class SeedTile(QWidget):
 
     def set_editable(self, editable: bool) -> None:
         self._word_field.setReadOnly(not editable)
+
+    def is_locked(self) -> bool:
+        return self._locked
+
+    def set_locked(self, locked: bool) -> None:
+        self._locked = locked
+        if self._lock_button is not None:
+            self._lock_button.setText("●" if locked else "○")
+        self.setProperty("locked", "true" if locked else "false")
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def set_blank(self, is_blank: bool) -> None:
         self.setProperty("blank", "true" if is_blank else "false")
