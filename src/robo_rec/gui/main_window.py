@@ -64,37 +64,35 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._build_top_bar())
 
         self._stack = AnimatedStackedWidget()
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(self._stack)
-        self._stack.currentChanged.connect(lambda: scroll.verticalScrollBar().setValue(0))
-        content_layout.addWidget(scroll, stretch=1)
+        self._stack.currentChanged.connect(self._reset_scroll_positions)
+        content_layout.addWidget(self._stack, stretch=1)
+
+        self._scroll_wrappers: dict[QWidget, QScrollArea] = {}
 
         self._dashboard = Dashboard()
         self._dashboard.action_selected.connect(self._show_action)
-        self._stack.addWidget(self._dashboard)
+        self._add_scrollable(self._dashboard)
 
         self._missing_words_panel = MissingWordsPanel()
         self._missing_words_panel.back_requested.connect(self._show_dashboard)
-        self._stack.addWidget(self._missing_words_panel)
+        self._add_scrollable(self._missing_words_panel)
 
         self._rearrange_panel = RearrangePanel()
         self._rearrange_panel.back_requested.connect(self._show_dashboard)
-        self._stack.addWidget(self._rearrange_panel)
+        self._add_scrollable(self._rearrange_panel)
 
         self._derive_wallet_panel = DeriveWalletPanel()
         self._derive_wallet_panel.back_requested.connect(self._show_dashboard)
-        self._stack.addWidget(self._derive_wallet_panel)
+        self._add_scrollable(self._derive_wallet_panel)
 
         self._typo_correction_panel = TypoCorrectionPanel()
         self._typo_correction_panel.back_requested.connect(self._show_dashboard)
-        self._stack.addWidget(self._typo_correction_panel)
+        self._add_scrollable(self._typo_correction_panel)
 
         self._gpu_status_panel = GpuStatusPanel()
         self._gpu_status_panel.back_requested.connect(self._show_dashboard)
         self._gpu_status_panel.set_report_callback(self.set_gpu_status)
-        self._stack.addWidget(self._gpu_status_panel)
+        self._add_scrollable(self._gpu_status_panel)
 
         self._panels_by_action = {
             ACTION_MISSING_WORDS: self._missing_words_panel,
