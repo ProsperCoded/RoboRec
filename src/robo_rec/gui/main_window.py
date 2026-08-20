@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
 
 from robo_rec.gui.dashboard import (
@@ -21,6 +22,17 @@ from robo_rec.gui.panels.typo_correction import TypoCorrectionPanel
 from robo_rec.gui.sidebar import Sidebar
 from robo_rec.gui.theme import ACCENT, STYLESHEET, TEXT_SECONDARY
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
+
+
+class _ClickableWidget(QWidget):
+    """Plain QWidget with a clicked signal, used for the top-bar GPU badge."""
+
+    clicked = Signal()
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -102,8 +114,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
         layout.addStretch(1)
 
-        self._gpu_badge = QWidget()
+        self._gpu_badge = _ClickableWidget()
         self._gpu_badge.setObjectName("GpuBadge")
+        self._gpu_badge.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._gpu_badge.setToolTip("View GPU Status")
+        self._gpu_badge.clicked.connect(self._show_gpu_status)
         badge_layout = QHBoxLayout(self._gpu_badge)
         badge_layout.setContentsMargins(12, 4, 12, 4)
         badge_layout.setSpacing(6)

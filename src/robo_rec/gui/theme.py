@@ -244,15 +244,9 @@ SeedTile[locked="true"] {{
 }}
 
 #SeedTileLockButton {{
-    color: {TEXT_MUTED};
-    font-size: 10px;
     border: none;
     background: transparent;
     padding: 0px;
-}}
-
-SeedTile[locked="true"] #SeedTileLockButton {{
-    color: {ACCENT};
 }}
 
 #SeedTileWord {{

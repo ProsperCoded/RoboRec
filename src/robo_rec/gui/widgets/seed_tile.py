@@ -9,7 +9,7 @@ Get Wallet from Seed Phrase.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -19,6 +19,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from robo_rec.gui.icons import load_icon
+from robo_rec.gui.theme import ACCENT, TEXT_MUTED
 
 BLANK_PLACEHOLDER = "····"
 
@@ -94,8 +97,10 @@ class SeedTile(QWidget):
 
         self._lock_button: QPushButton | None = None
         if lockable:
-            self._lock_button = QPushButton("○")
+            self._lock_button = QPushButton()
             self._lock_button.setObjectName("SeedTileLockButton")
+            self._lock_button.setIcon(load_icon("lock-open", TEXT_MUTED, 12))
+            self._lock_button.setIconSize(QSize(12, 12))
             self._lock_button.setFlat(True)
             self._lock_button.setFixedSize(16, 16)
             self._lock_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -144,7 +149,9 @@ class SeedTile(QWidget):
     def set_locked(self, locked: bool) -> None:
         self._locked = locked
         if self._lock_button is not None:
-            self._lock_button.setText("●" if locked else "○")
+            icon_name = "lock" if locked else "lock-open"
+            icon_color = ACCENT if locked else TEXT_MUTED
+            self._lock_button.setIcon(load_icon(icon_name, icon_color, 12))
         self.setProperty("locked", "true" if locked else "false")
         self.style().unpolish(self)
         self.style().polish(self)
