@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from robo_rec.gui.dashboard import (
     ACTION_DERIVE_WALLET,
