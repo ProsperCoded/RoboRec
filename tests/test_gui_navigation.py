@@ -1,3 +1,5 @@
+from PySide6.QtWidgets import QScrollArea
+
 from robo_rec.gui.dashboard import (
     ACTION_DERIVE_WALLET,
     ACTION_MISSING_WORDS,
@@ -6,10 +8,17 @@ from robo_rec.gui.dashboard import (
 from robo_rec.gui.main_window import MainWindow
 
 
+def _current_panel(window):
+    current = window._stack.currentWidget()
+    if isinstance(current, QScrollArea):
+        return current.widget()
+    return current
+
+
 def test_dashboard_is_initial_view(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window._stack.currentWidget() is window._dashboard
+    assert _current_panel(window) is window._dashboard
 
 
 def test_selecting_each_action_swaps_to_its_panel(qtbot):
@@ -17,13 +26,13 @@ def test_selecting_each_action_swaps_to_its_panel(qtbot):
     qtbot.addWidget(window)
 
     window._show_action(ACTION_MISSING_WORDS)
-    assert window._stack.currentWidget() is window._missing_words_panel
+    assert _current_panel(window) is window._missing_words_panel
 
     window._show_action(ACTION_REARRANGE)
-    assert window._stack.currentWidget() is window._rearrange_panel
+    assert _current_panel(window) is window._rearrange_panel
 
     window._show_action(ACTION_DERIVE_WALLET)
-    assert window._stack.currentWidget() is window._derive_wallet_panel
+    assert _current_panel(window) is window._derive_wallet_panel
 
 
 def test_back_breadcrumb_returns_to_dashboard(qtbot):
@@ -32,7 +41,7 @@ def test_back_breadcrumb_returns_to_dashboard(qtbot):
 
     window._show_action(ACTION_MISSING_WORDS)
     window._missing_words_panel.back_requested.emit()
-    assert window._stack.currentWidget() is window._dashboard
+    assert _current_panel(window) is window._dashboard
 
 
 def test_gpu_badge_reflects_status(qtbot):

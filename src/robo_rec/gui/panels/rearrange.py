@@ -35,7 +35,7 @@ from robo_rec.gui.coin_options import (
     detect_coin_label,
     wallet_type_for_coin,
 )
-from robo_rec.gui.estimate import format_estimate_range
+from robo_rec.gui.estimate import format_estimate
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.recovery_worker import RecoveryWorker
@@ -247,7 +247,7 @@ class RearrangePanel(BasePanel):
         self._scrambled_count_label.setText(f"SCRAMBLED: {scrambled_count}")
         combinations = combinations_for(scrambled_count)
         self._estimate_label.setText(
-            f"Estimated time: {format_estimate_range(combinations)} "
+            f"Estimated time: {format_estimate(combinations)} "
             f"(based on {scrambled_count} scrambled word(s))"
         )
 

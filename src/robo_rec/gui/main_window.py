@@ -19,6 +19,7 @@ from robo_rec.gui.dashboard import (
     ACTION_TYPO_CORRECTION,
     Dashboard,
 )
+from robo_rec.gui.gpu_state import set_gpu_available
 from robo_rec.gui.gpu_worker import GpuProbeWorker
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.derive_wallet import DeriveWalletPanel
@@ -141,8 +142,10 @@ class MainWindow(QMainWindow):
         return top_bar
 
     def set_gpu_status(self, detected: bool) -> None:
-        """Update the top-bar GPU badge. Called once at startup with a real probe result,
-        and again whenever the GPU Status panel re-checks."""
+        """Update the top-bar GPU badge and the process-wide GPU-availability cache that
+        recovery panels read for their time estimates. Called once at startup with a real
+        probe result, and again whenever the GPU Status panel re-checks."""
+        set_gpu_available(detected)
         color = ACCENT if detected else TEXT_SECONDARY
         self._gpu_badge_icon.setPixmap(load_pixmap("cpu", color, 14))
         self._gpu_badge_text.setText("GPU Detected" if detected else "CPU Only")
@@ -163,22 +166,39 @@ class MainWindow(QMainWindow):
             self._startup_gpu_worker.wait_and_cleanup()
             self._startup_gpu_worker = None
 
+    def _add_scrollable(self, panel: QWidget) -> None:
+        """Wrap `panel` in a QScrollArea and add it to the stack, so panels taller
+        than the window (long forms, seed tile grids) scroll instead of clipping."""
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(panel)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._scroll_wrappers[panel] = scroll_area
+        self._stack.addWidget(scroll_area)
+
+    def _reset_scroll_positions(self) -> None:
+        """Scroll the incoming page back to the top on every view switch, so
+        re-entering a panel never lands mid-scroll from a previous visit."""
+        current = self._stack.currentWidget()
+        if isinstance(current, QScrollArea):
+            current.verticalScrollBar().setValue(0)
+
     def _show_dashboard(self) -> None:
         self._sidebar.set_active(True)
-        self._stack.setCurrentWidget(self._dashboard)
+        self._stack.setCurrentWidget(self._scroll_wrappers[self._dashboard])
 
     def _show_gpu_status(self) -> None:
         """Reached only via the top-bar GPU badge — not a sidebar tab, since it's a
         one-off diagnostics view rather than a recovery scenario. The sidebar's 'Actions'
         stays unchecked while here, matching the derive/missing-words/etc. panels."""
         self._sidebar.set_active(False)
-        self._stack.setCurrentWidget(self._gpu_status_panel)
+        self._stack.setCurrentWidget(self._scroll_wrappers[self._gpu_status_panel])
 
     def _show_action(self, action: str) -> None:
         panel = self._panels_by_action.get(action)
         if panel is not None:
             self._sidebar.set_active(False)
-            self._stack.setCurrentWidget(panel)
+            self._stack.setCurrentWidget(self._scroll_wrappers[panel])
             if panel is self._missing_words_panel:
                 self._missing_words_panel.focus_first_word()
 

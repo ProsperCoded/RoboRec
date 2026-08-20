@@ -10,7 +10,9 @@ Get Wallet from Seed Phrase.
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -37,11 +39,27 @@ class _WordField(QLineEdit):
         self._index = index
 
     def keyPressEvent(self, event) -> None:
+        if event.matches(QKeySequence.StandardKey.Paste):
+            if self._try_split_paste():
+                return
+            super().keyPressEvent(event)
+            return
         if event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Space, Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.advance_requested.emit(self._index)
             if event.key() != Qt.Key.Key_Tab:
                 return
         super().keyPressEvent(event)
+
+    def _try_split_paste(self) -> bool:
+        """Handles Ctrl+V directly instead of relying on insertFromMimeData/paste(),
+        neither of which reliably fires for QLineEdit's built-in paste shortcut."""
+        clipboard_text = QApplication.clipboard().text()
+        words = clipboard_text.split()
+        if len(words) <= 1:
+            return False
+        self.setText(words[0])
+        self.paste_overflow.emit(self._index, words[1:])
+        return True
 
     def insertFromMimeData(self, source) -> None:
         text = source.text() if source.hasText() else ""

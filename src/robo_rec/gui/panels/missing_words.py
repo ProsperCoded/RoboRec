@@ -35,7 +35,7 @@ from robo_rec.gui.coin_options import (
     detect_coin_label,
     wallet_type_for_coin,
 )
-from robo_rec.gui.estimate import format_estimate_range
+from robo_rec.gui.estimate import format_estimate
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.recovery_worker import RecoveryWorker
@@ -296,7 +296,7 @@ class MissingWordsPanel(BasePanel):
         else:
             combinations = combinations_for(total, missing, known_position=known_position)
             estimate_text = (
-                f"Estimated time: {format_estimate_range(combinations)} "
+                f"Estimated time: {format_estimate(combinations)} "
                 f"(based on {missing} missing word(s))"
             )
         self._estimate_label.setText(estimate_text)
@@ -344,7 +344,7 @@ class MissingWordsPanel(BasePanel):
         combinations = combinations_for(
             len(words), self._seed_row.missing_count(), known_position=known_position
         )
-        self._loading_subtitle.setText(f"Estimated time: {format_estimate_range(combinations)}.")
+        self._loading_subtitle.setText(f"Estimated time: {format_estimate(combinations)}.")
         self._phase_label.setText("")
         self._view_stack.setCurrentIndex(1)
         self._start_search(spec)

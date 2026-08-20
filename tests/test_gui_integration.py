@@ -163,12 +163,17 @@ def test_unsupported_coin_shows_warning_instead_of_crashing(qtbot, monkeypatch):
 
 def test_gpu_badge_click_navigates_to_gpu_status_panel(qtbot):
     from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QScrollArea
+
+    def current_panel(window):
+        current = window._stack.currentWidget()
+        return current.widget() if isinstance(current, QScrollArea) else current
 
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window._stack.currentWidget() is window._dashboard
+    assert current_panel(window) is window._dashboard
 
     qtbot.mouseClick(window._gpu_badge, Qt.MouseButton.LeftButton)
 
-    assert window._stack.currentWidget() is window._gpu_status_panel
+    assert current_panel(window) is window._gpu_status_panel
     window.close()
