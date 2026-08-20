@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QScrollArea, QVBoxLayout, QWidget
 
 from robo_rec.gui.dashboard import (
     ACTION_DERIVE_WALLET,
@@ -64,7 +64,12 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._build_top_bar())
 
         self._stack = AnimatedStackedWidget()
-        content_layout.addWidget(self._stack, stretch=1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(self._stack)
+        self._stack.currentChanged.connect(lambda: scroll.verticalScrollBar().setValue(0))
+        content_layout.addWidget(scroll, stretch=1)
 
         self._dashboard = Dashboard()
         self._dashboard.action_selected.connect(self._show_action)

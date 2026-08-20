@@ -28,6 +28,10 @@ QWidget {{
     font-size: 13px;
 }}
 
+QLabel, QRadioButton, QCheckBox {{
+    background-color: transparent;
+}}
+
 QMainWindow, #ContentArea {{
     background-color: {BG};
 }}
@@ -391,5 +395,14 @@ QScrollBar::handle:vertical {{
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
     height: 0px;
+}}
+
+QScrollArea {{
+    background-color: transparent;
+    border: none;
+}}
+
+QScrollArea > QWidget > QWidget {{
+    background-color: transparent;
 }}
 """
