@@ -78,6 +78,21 @@ def test_gpu_status_panel_shows_real_probe_result(qtbot):
     window.close()
 
 
+def test_gpu_status_panel_shows_real_cpu_details_when_no_gpu(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    panel = window._gpu_status_panel
+
+    qtbot.waitUntil(lambda: panel._latest_report is not None, timeout=15000)
+    # No discrete GPU on this dev machine, so the CPU details section should be shown
+    # and populated with real platform data (robo-rec-implementation.md).
+    assert panel._latest_report.gpu_acceleration_available is False
+    assert panel._cpu_group.isVisibleTo(panel)
+    assert panel._cpu_cores_label.text()
+    assert panel._cpu_os_label.text()
+    window.close()
+
+
 def test_typo_correction_panel_recovers_real_typo_via_ui(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)

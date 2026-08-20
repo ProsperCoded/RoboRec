@@ -52,7 +52,6 @@ class MainWindow(QMainWindow):
 
         self._sidebar = Sidebar()
         self._sidebar.actions_requested.connect(self._show_dashboard)
-        self._sidebar.gpu_status_requested.connect(self._show_gpu_status)
         root_layout.addWidget(self._sidebar)
 
         content_area = QWidget()
@@ -155,17 +154,20 @@ class MainWindow(QMainWindow):
             self._startup_gpu_worker = None
 
     def _show_dashboard(self) -> None:
-        self._sidebar.set_active("actions")
+        self._sidebar.set_active(True)
         self._stack.setCurrentWidget(self._dashboard)
 
     def _show_gpu_status(self) -> None:
-        self._sidebar.set_active("gpu_status")
+        """Reached only via the top-bar GPU badge — not a sidebar tab, since it's a
+        one-off diagnostics view rather than a recovery scenario. The sidebar's 'Actions'
+        stays unchecked while here, matching the derive/missing-words/etc. panels."""
+        self._sidebar.set_active(False)
         self._stack.setCurrentWidget(self._gpu_status_panel)
 
     def _show_action(self, action: str) -> None:
         panel = self._panels_by_action.get(action)
         if panel is not None:
-            self._sidebar.set_active("actions")
+            self._sidebar.set_active(False)
             self._stack.setCurrentWidget(panel)
             if panel is self._missing_words_panel:
                 self._missing_words_panel.focus_first_word()

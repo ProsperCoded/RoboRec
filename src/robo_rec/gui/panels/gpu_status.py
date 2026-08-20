@@ -63,6 +63,18 @@ class GpuStatusPanel(BasePanel):
         details_layout.addWidget(self._pycuda_label)
         self.root_layout.addWidget(details_group)
 
+        self._cpu_group = QGroupBox("Running on CPU")
+        cpu_layout = QVBoxLayout(self._cpu_group)
+        self._cpu_model_label = QLabel()
+        self._cpu_model_label.setWordWrap(True)
+        cpu_layout.addWidget(self._cpu_model_label)
+        self._cpu_cores_label = QLabel()
+        cpu_layout.addWidget(self._cpu_cores_label)
+        self._cpu_os_label = QLabel()
+        cpu_layout.addWidget(self._cpu_os_label)
+        self._cpu_group.setVisible(False)
+        self.root_layout.addWidget(self._cpu_group)
+
         self._errors_label = QLabel()
         self._errors_label.setObjectName("InfoNotice")
         self._errors_label.setWordWrap(True)
@@ -113,9 +125,12 @@ class GpuStatusPanel(BasePanel):
         if report.gpu_acceleration_available:
             self._summary_icon.setPixmap(load_pixmap("cpu", ACCENT, 20))
             self._summary_label.setText("GPU acceleration available")
+            self._cpu_group.setVisible(False)
         else:
             self._summary_icon.setPixmap(load_pixmap("cpu", TEXT_SECONDARY, 20))
             self._summary_label.setText("No GPU acceleration — running on CPU")
+            self._populate_cpu_details(report.cpu_info)
+            self._cpu_group.setVisible(True)
 
         if report.nvidia_gpu_name:
             self._nvidia_label.setText(
@@ -145,6 +160,16 @@ class GpuStatusPanel(BasePanel):
 
         if self._on_report_ready is not None:
             self._on_report_ready(report.gpu_acceleration_available)
+
+    def _populate_cpu_details(self, cpu_info) -> None:
+        self._cpu_model_label.setText(cpu_info.model_name or "Model name unavailable")
+        cores_text = (
+            f"{cpu_info.logical_cores} logical cores  ·  {cpu_info.architecture}"
+            if cpu_info.logical_cores
+            else cpu_info.architecture
+        )
+        self._cpu_cores_label.setText(cores_text)
+        self._cpu_os_label.setText(cpu_info.os_name)
 
     def set_report_callback(self, callback) -> None:
         """Optional hook so MainWindow can update its top-bar GPU badge from real data."""

@@ -1,9 +1,12 @@
-"""Composes the OpenCL, NVIDIA driver, and PyCUDA probes into one GPU status report (PRD 4.5).
+"""Composes the OpenCL, NVIDIA driver, PyCUDA, and CPU probes into one status report
+(PRD 4.5).
 
-Every individual probe failure is caught and appended to probe_errors rather than raised —
-this dev machine has no discrete GPU, so every code path here must degrade gracefully; that's
-also exactly what makes it fully testable right now (mocked subprocess output covers the
-"no GPU" branch, which is this machine's actual live state).
+Every GPU probe's failure is caught and appended to probe_errors rather than raised — this
+dev machine has no discrete GPU, so every code path here must degrade gracefully; that's also
+exactly what makes it fully testable right now (mocked subprocess output covers the "no GPU"
+branch, which is this machine's actual live state). CPU info is always populated (it's pure
+stdlib, no failure mode) so the GPU Status view has something concrete to show when no GPU is
+detected, rather than just an absence.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from robo_rec.gpu.cpu_probe import CpuInfo, probe_cpu
 from robo_rec.gpu.nvidia_probe import probe_nvidia
 from robo_rec.gpu.opencl_probe import OpenClDeviceInfo, probe_opencl
 from robo_rec.gpu.pycuda_probe import probe_pycuda_importable
@@ -26,6 +30,7 @@ class GpuStatusReport:
     nvidia_driver_version: str | None
     cuda_toolkit_version: str | None
     pycuda_importable: bool
+    cpu_info: CpuInfo
     probe_errors: list[str]
     generated_at: datetime
 
@@ -58,6 +63,7 @@ def probe_gpu_status(*, btcrecover_dir: Path | None = None) -> GpuStatusReport:
         nvidia_driver_version=nvidia_result.driver_version,
         cuda_toolkit_version=nvidia_result.cuda_toolkit_version,
         pycuda_importable=pycuda_ok,
+        cpu_info=probe_cpu(),
         probe_errors=errors,
         generated_at=datetime.now(UTC),
     )

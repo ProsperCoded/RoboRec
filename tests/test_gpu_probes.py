@@ -1,6 +1,7 @@
 import subprocess
 from unittest.mock import patch
 
+from robo_rec.gpu.cpu_probe import probe_cpu
 from robo_rec.gpu.nvidia_probe import probe_nvidia
 from robo_rec.gpu.opencl_probe import _parse_devices, probe_opencl
 from robo_rec.gpu.pycuda_probe import probe_pycuda_importable
@@ -14,8 +15,22 @@ def test_probe_gpu_status_degrades_gracefully_with_no_gpu():
     assert report.opencl_available is False
     assert report.nvidia_driver_version is None
     assert report.pycuda_importable is False
-    assert len(report.probe_errors) == 3
+    assert len(report.probe_errors) == 3  # CPU probe has no failure mode, adds none
     assert report.gpu_acceleration_available is False
+
+
+def test_probe_gpu_status_always_includes_cpu_info():
+    report = probe_gpu_status()
+    assert report.cpu_info.architecture
+    assert report.cpu_info.os_name
+    assert report.cpu_info.logical_cores is not None and report.cpu_info.logical_cores > 0
+
+
+def test_probe_cpu_returns_real_values():
+    info = probe_cpu()
+    assert info.architecture
+    assert info.os_name
+    assert info.logical_cores is not None and info.logical_cores > 0
 
 
 def test_probe_nvidia_reports_missing_binary_cleanly():
