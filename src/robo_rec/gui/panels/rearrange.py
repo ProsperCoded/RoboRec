@@ -35,6 +35,7 @@ from robo_rec.gui.coin_options import (
     detect_coin_label,
     wallet_type_for_coin,
 )
+from robo_rec.gui.estimate import format_estimate_range
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.recovery_worker import RecoveryWorker
@@ -44,26 +45,11 @@ from robo_rec.gui.widgets.seed_row import SeedRow
 from robo_rec.recovery.exceptions import InvalidSpecError
 from robo_rec.recovery.models import RearrangementSpec
 
-# Illustrative combinations-per-minute rate for the estimate shown before a run;
-# not a measured benchmark — real timing depends on hardware and GPU availability.
-COMBINATIONS_PER_MINUTE = 2_000_000
 
-
-def estimate_minutes(scrambled_count: int) -> float:
+def combinations_for(scrambled_count: int) -> int:
     if scrambled_count < 2:
-        return 0.0
-    return max(math.factorial(scrambled_count) / COMBINATIONS_PER_MINUTE, 0.1)
-
-
-def format_estimate(minutes: float) -> str:
-    if minutes < 1:
-        return "under a minute"
-    if minutes < 60:
-        return f"~{minutes:.0f} min"
-    hours = minutes / 60
-    if hours < 48:
-        return f"~{hours:.1f} hrs"
-    return f"~{hours / 24:.1f} days"
+        return 0
+    return math.factorial(scrambled_count)
 
 
 class RearrangePanel(BasePanel):
@@ -259,9 +245,10 @@ class RearrangePanel(BasePanel):
         locked = set(self._seed_row.locked_indices())
         scrambled_count = len(self._seed_row.tiles()) - len(locked)
         self._scrambled_count_label.setText(f"SCRAMBLED: {scrambled_count}")
-        minutes = estimate_minutes(scrambled_count)
+        combinations = combinations_for(scrambled_count)
         self._estimate_label.setText(
-            f"Estimated time: {format_estimate(minutes)} (based on {scrambled_count} scrambled word(s))"
+            f"Estimated time: {format_estimate_range(combinations)} "
+            f"(based on {scrambled_count} scrambled word(s))"
         )
 
     def _on_proceed_clicked(self) -> None:

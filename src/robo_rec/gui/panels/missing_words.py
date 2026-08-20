@@ -35,6 +35,7 @@ from robo_rec.gui.coin_options import (
     detect_coin_label,
     wallet_type_for_coin,
 )
+from robo_rec.gui.estimate import format_estimate_range
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.recovery_worker import RecoveryWorker
@@ -48,9 +49,10 @@ KNOWN_POSITION_MAX = 4
 UNKNOWN_POSITION_MAX = 2
 
 KNOWN_POSITION_WARNINGS = {
-    3: "3 missing words at known positions can take hours; faster with a GPU.",
-    4: "4 missing words at known positions may take hours to days. GPU is "
-    "strongly recommended before starting.",
+    3: "3 missing words at known positions can take hours on a GPU, up to a "
+    "few days on CPU alone.",
+    4: "4 missing words at known positions can take days even with a GPU. "
+    "GPU is strongly recommended before starting.",
 }
 UNKNOWN_POSITION_OVER_LIMIT = (
     "Robo-Rec can only search unknown positions for 1-2 missing words — beyond "
@@ -58,29 +60,14 @@ UNKNOWN_POSITION_OVER_LIMIT = (
     "positions you do know, or reduce the number of blanks."
 )
 
-# Illustrative combinations-per-minute rate for the estimate shown before a run;
-# not a measured benchmark — real timing depends on hardware and GPU availability.
-COMBINATIONS_PER_MINUTE = 2_000_000
 
-
-def estimate_minutes(total_words: int, missing: int, *, known_position: bool) -> float:
+def combinations_for(total_words: int, missing: int, *, known_position: bool) -> int:
     if missing == 0:
-        return 0.0
+        return 0
     combinations = 2048**missing
     if not known_position:
         combinations *= math.comb(total_words, missing)
-    return max(combinations / COMBINATIONS_PER_MINUTE, 0.1)
-
-
-def format_estimate(minutes: float) -> str:
-    if minutes < 1:
-        return "under a minute"
-    if minutes < 60:
-        return f"~{minutes:.0f} min"
-    hours = minutes / 60
-    if hours < 48:
-        return f"~{hours:.1f} hrs"
-    return f"~{hours / 24:.1f} days"
+    return combinations
 
 
 class MissingWordsPanel(BasePanel):
@@ -307,8 +294,11 @@ class MissingWordsPanel(BasePanel):
         if missing == 0:
             estimate_text = "Fill in at least one blank to see a time estimate."
         else:
-            minutes = estimate_minutes(total, missing, known_position=known_position)
-            estimate_text = f"Estimated time: {format_estimate(minutes)} (based on {missing} missing word(s))"
+            combinations = combinations_for(total, missing, known_position=known_position)
+            estimate_text = (
+                f"Estimated time: {format_estimate_range(combinations)} "
+                f"(based on {missing} missing word(s))"
+            )
         self._estimate_label.setText(estimate_text)
 
         self._start_button.setEnabled(0 < missing <= limit)
@@ -351,8 +341,10 @@ class MissingWordsPanel(BasePanel):
             QMessageBox.warning(self, "Can't start this search", str(exc))
             return
 
-        minutes = estimate_minutes(len(words), self._seed_row.missing_count(), known_position=known_position)
-        self._loading_subtitle.setText(f"Estimated time: {format_estimate(minutes)}.")
+        combinations = combinations_for(
+            len(words), self._seed_row.missing_count(), known_position=known_position
+        )
+        self._loading_subtitle.setText(f"Estimated time: {format_estimate_range(combinations)}.")
         self._phase_label.setText("")
         self._view_stack.setCurrentIndex(1)
         self._start_search(spec)
