@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGridLayout, QLabel, QVBoxLayout, QWidget
 
 from robo_rec.gui.widgets.card import ActionCard
 
@@ -34,8 +34,8 @@ class Dashboard(QWidget):
         subtitle.setObjectName("DashboardSubtitle")
         layout.addWidget(subtitle)
 
-        cards_row = QHBoxLayout()
-        cards_row.setSpacing(18)
+        grid = QGridLayout()
+        grid.setSpacing(18)
 
         missing_words_card = ActionCard(
             "hash",
@@ -46,7 +46,7 @@ class Dashboard(QWidget):
         missing_words_card.clicked.connect(
             lambda: self.action_selected.emit(ACTION_MISSING_WORDS)
         )
-        cards_row.addWidget(missing_words_card)
+        grid.addWidget(missing_words_card, 0, 0)
 
         rearrange_card = ActionCard(
             "shuffle",
@@ -57,7 +57,7 @@ class Dashboard(QWidget):
         rearrange_card.clicked.connect(
             lambda: self.action_selected.emit(ACTION_REARRANGE)
         )
-        cards_row.addWidget(rearrange_card)
+        grid.addWidget(rearrange_card, 0, 1)
 
         derive_wallet_card = ActionCard(
             "key",
@@ -67,7 +67,7 @@ class Dashboard(QWidget):
         derive_wallet_card.clicked.connect(
             lambda: self.action_selected.emit(ACTION_DERIVE_WALLET)
         )
-        cards_row.addWidget(derive_wallet_card)
+        grid.addWidget(derive_wallet_card, 1, 0)
 
         typo_correction_card = ActionCard(
             "square-plus",
@@ -78,7 +78,7 @@ class Dashboard(QWidget):
         typo_correction_card.clicked.connect(
             lambda: self.action_selected.emit(ACTION_TYPO_CORRECTION)
         )
-        cards_row.addWidget(typo_correction_card)
+        grid.addWidget(typo_correction_card, 1, 1)
 
-        layout.addLayout(cards_row)
+        layout.addLayout(grid)
         layout.addStretch(1)

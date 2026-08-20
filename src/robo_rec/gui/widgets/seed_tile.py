@@ -78,6 +78,7 @@ class SeedTile(QWidget):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("SeedTile")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._index = index
         self._locked = False
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)

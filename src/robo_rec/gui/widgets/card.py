@@ -23,6 +23,7 @@ class ActionCard(QWidget):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("ActionCard")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.setMinimumHeight(150)
