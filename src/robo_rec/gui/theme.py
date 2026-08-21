@@ -253,6 +253,18 @@ SeedTile[locked="true"] {{
     padding: 0px;
 }}
 
+#CopyButton {{
+    border: 1px solid {BORDER};
+    background-color: {SURFACE_RAISED};
+    border-radius: 6px;
+    padding: 0px;
+}}
+
+#CopyButton:hover {{
+    border: 1px solid {ACCENT};
+    background-color: {SURFACE};
+}}
+
 #SeedTileWord {{
     font-family: {FONT_MONO};
     font-size: 12px;

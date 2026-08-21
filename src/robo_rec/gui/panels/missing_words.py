@@ -38,6 +38,7 @@ from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.recovery_worker import RecoveryWorker
 from robo_rec.gui.theme import ACCENT
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
+from robo_rec.gui.widgets.copy_button import CopyButton
 from robo_rec.gui.widgets.search_progress import SearchProgressWidget
 from robo_rec.gui.widgets.seed_row import SeedRow
 from robo_rec.recovery.exceptions import InvalidSpecError
@@ -194,6 +195,15 @@ class MissingWordsPanel(BasePanel):
         self._result_subtitle.setObjectName("DashboardSubtitle")
         self._result_subtitle.setWordWrap(True)
         layout.addWidget(self._result_subtitle)
+
+        seed_header = QHBoxLayout()
+        seed_label = QLabel("SEED PHRASE")
+        seed_label.setObjectName("SectionLabel")
+        seed_header.addWidget(seed_label)
+        seed_header.addStretch(1)
+        self._copy_button = CopyButton()
+        seed_header.addWidget(self._copy_button)
+        layout.addLayout(seed_header)
 
         self._result_row = SeedRow(length=12, editable=False)
         layout.addWidget(self._result_row)
@@ -357,6 +367,8 @@ class MissingWordsPanel(BasePanel):
             words = result.mnemonic.split()
             self._result_row.set_length(len(words))
             self._result_row.set_words(words)
+            self._copy_button.set_text_to_copy(result.mnemonic)
+            self._copy_button.setVisible(True)
         else:
             self._result_icon.setPixmap(load_pixmap("loader-circle", ACCENT, 22))
             self._result_title.setText("No matching phrase found")
@@ -366,6 +378,7 @@ class MissingWordsPanel(BasePanel):
             )
             self._result_row.set_length(len(self._seed_row.tiles()))
             self._result_row.set_words(self._seed_row.words())
+            self._copy_button.setVisible(False)
         self._view_stack.setCurrentIndex(2)
 
     def _reset_to_form(self) -> None:

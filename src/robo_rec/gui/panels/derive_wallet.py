@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from robo_rec.derivation import derive_addresses, verify_address
 from robo_rec.gui.coin_options import COIN_OPTION_LABELS, UNSUPPORTED_COIN_MESSAGE, coin_for_label
 from robo_rec.gui.panels.base_panel import BasePanel
+from robo_rec.gui.widgets.copy_button import CopyButton
 from robo_rec.gui.widgets.seed_row import SeedRow
 from robo_rec.util.mnemonic import is_valid_mnemonic
 
@@ -149,6 +150,7 @@ class DeriveWalletPanel(BasePanel):
         address_field.setReadOnly(True)
         address_field.setObjectName("SeedTileWord")
         address_row.addWidget(address_field, stretch=1)
+        address_row.addWidget(CopyButton(address))
         row.addLayout(address_row)
 
         if path:

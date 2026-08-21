@@ -27,6 +27,8 @@ def test_missing_words_panel_recovers_real_blank_via_ui(qtbot):
     qtbot.waitUntil(lambda: panel._view_stack.currentIndex() == 2, timeout=15000)
 
     assert panel._result_row.words() == WORDS
+    assert panel._copy_button.isVisibleTo(panel)
+    assert panel._copy_button._text_to_copy == MNEMONIC
     window.close()
 
 
