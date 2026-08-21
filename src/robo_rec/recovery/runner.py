@@ -35,25 +35,34 @@ from robo_rec.util.paths import btcrecover_root, seedrecover_script
 from robo_rec.util.process import python_executable, stream_lines
 
 
-def _build_argv_and_tokenlist(spec: RecoverySpec) -> tuple[list[str], Path | None]:
+def _build_argv_and_tokenlist(
+    spec: RecoverySpec, *, use_gpu: bool
+) -> tuple[list[str], Path | None]:
     if isinstance(spec, RearrangementSpec):
-        argv, tokenlist_path = build_rearrangement_args(spec)
+        argv, tokenlist_path = build_rearrangement_args(spec, use_gpu=use_gpu)
         return argv, tokenlist_path
     if isinstance(spec, MissingWordKnownPositionSpec):
-        return build_missing_word_known_position_args(spec), None
+        return build_missing_word_known_position_args(spec, use_gpu=use_gpu), None
     if isinstance(spec, MissingWordUnknownPositionSpec):
-        return build_missing_word_unknown_position_args(spec), None
+        return build_missing_word_unknown_position_args(spec, use_gpu=use_gpu), None
     if isinstance(spec, TypoCorrectionSpec):
-        return build_typo_correction_args(spec), None
+        return build_typo_correction_args(spec, use_gpu=use_gpu), None
     raise TypeError(f"Unrecognized RecoverySpec variant: {type(spec).__name__}")
 
 
 class BtcrecoverRunner:
     """Not Qt-affine; safe to construct and drive from any single thread at a time."""
 
-    def __init__(self, spec: RecoverySpec, *, btcrecover_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        spec: RecoverySpec,
+        *,
+        btcrecover_dir: Path | None = None,
+        use_gpu: bool = False,
+    ) -> None:
         self._spec = spec
         self._btcrecover_dir = btcrecover_dir or btcrecover_root()
+        self._use_gpu = use_gpu
         self._process: subprocess.Popen | None = None
         self._stop_event = threading.Event()
         self._tokenlist_path: Path | None = None
@@ -84,7 +93,7 @@ class BtcrecoverRunner:
     def run_iter(self) -> Iterator[RecoveryEvent]:
         """Generator alternative to run(). Final yielded event has kind == 'finished' with
         .result populated. Cleans up any generated tokenlist file on exit or cancellation."""
-        argv, tokenlist_path = _build_argv_and_tokenlist(self._spec)
+        argv, tokenlist_path = _build_argv_and_tokenlist(self._spec, use_gpu=self._use_gpu)
         self._tokenlist_path = tokenlist_path
         full_argv = [python_executable(), str(seedrecover_script()), *argv]
 

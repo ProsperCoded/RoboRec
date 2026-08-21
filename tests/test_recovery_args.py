@@ -35,6 +35,48 @@ def test_missing_word_known_position_uses_placeholder():
     assert argv[argv.index("--addrs") + 1] == ADDR
 
 
+def test_missing_word_known_position_omits_gpu_flag_by_default():
+    words = WORDS_12.copy()
+    words[4] = None
+    spec = MissingWordKnownPositionSpec(words=words, wallet_type="bip39", addrs=[ADDR])
+    argv = build_missing_word_known_position_args(spec)
+    assert "--enable-opencl" not in argv
+
+
+def test_missing_word_known_position_passes_enable_opencl_when_gpu_requested():
+    """--enable-opencl, not --enable-gpu: the latter requires init_opencl_kernel(), which
+    WalletBIP39 doesn't implement (only WalletBitcoinCore does) and would error_exit
+    immediately in btcrpass.py. See the module docstring for the full trace."""
+    words = WORDS_12.copy()
+    words[4] = None
+    spec = MissingWordKnownPositionSpec(words=words, wallet_type="bip39", addrs=[ADDR])
+    argv = build_missing_word_known_position_args(spec, use_gpu=True)
+    assert "--enable-opencl" in argv
+    assert "--enable-gpu" not in argv
+
+
+def test_rearrangement_passes_enable_opencl_when_gpu_requested():
+    known = [None] * 12
+    known[0], known[1] = "rotate", "dream"
+    scrambled = WORDS_12[2:]
+    spec = RearrangementSpec(
+        known_words=known, scrambled_words=scrambled, wallet_type="bip39", addrs=[ADDR]
+    )
+    argv, tokenlist_path = build_rearrangement_args(spec, use_gpu=True)
+    try:
+        assert "--enable-opencl" in argv
+    finally:
+        tokenlist_path.unlink()
+
+
+def test_typo_correction_passes_enable_opencl_when_gpu_requested():
+    spec = TypoCorrectionSpec(
+        best_guess_mnemonic=" ".join(WORDS_12), wallet_type="bip39", addrs=[ADDR]
+    )
+    argv = build_typo_correction_args(spec, use_gpu=True)
+    assert "--enable-opencl" in argv
+
+
 def test_missing_word_unknown_position_omits_word_and_sets_length():
     words = WORDS_12.copy()
     del words[4]  # omit "key" entirely — no placeholder
@@ -47,6 +89,16 @@ def test_missing_word_unknown_position_omits_word_and_sets_length():
     assert mnemonic == "rotate dream drip opinion dove region mind visit diesel negative speed"
     assert "%%" not in mnemonic
     assert argv[argv.index("--mnemonic-length") + 1] == "12"
+
+
+def test_missing_word_unknown_position_passes_enable_opencl_when_gpu_requested():
+    words = WORDS_12.copy()
+    del words[4]
+    spec = MissingWordUnknownPositionSpec(
+        words=words, full_length=12, wallet_type="bip39", addrs=[ADDR]
+    )
+    argv = build_missing_word_unknown_position_args(spec, use_gpu=True)
+    assert "--enable-opencl" in argv
 
 
 def test_typo_correction_passes_full_mnemonic_as_is():

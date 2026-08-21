@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+from robo_rec.gui.gpu_state import is_gpu_available
 from robo_rec.recovery.exceptions import RecoveryError
 from robo_rec.recovery.models import RecoveryEvent, RecoveryResult, RecoverySpec
 from robo_rec.recovery.runner import BtcrecoverRunner
@@ -56,7 +57,7 @@ class RecoveryWorker(QObject):
 
     def __init__(self, spec: RecoverySpec, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._runner = BtcrecoverRunner(spec)
+        self._runner = BtcrecoverRunner(spec, use_gpu=is_gpu_available())
         self._thread = QThread(self)
         self._task = _RunnerTask(self._runner)
         self._task.moveToThread(self._thread)
