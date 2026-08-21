@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QTransform
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -22,7 +20,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
-    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -41,6 +38,7 @@ from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.recovery_worker import RecoveryWorker
 from robo_rec.gui.theme import ACCENT
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
+from robo_rec.gui.widgets.search_progress import SearchProgressWidget
 from robo_rec.gui.widgets.seed_row import SeedRow
 from robo_rec.recovery.exceptions import InvalidSpecError
 from robo_rec.recovery.models import RearrangementSpec
@@ -68,13 +66,12 @@ class RearrangePanel(BasePanel):
         self.root_layout.addWidget(self._view_stack, stretch=1)
 
         self._view_stack.addWidget(self._build_form_view())
-        self._view_stack.addWidget(self._build_loading_view())
-        self._view_stack.addWidget(self._build_result_view())
 
-        self._spinner_timer = QTimer(self)
-        self._spinner_timer.setInterval(180)
-        self._spinner_timer.timeout.connect(self._advance_spinner)
-        self._loading_rotation = 0
+        self._progress = SearchProgressWidget("Searching for the correct order")
+        self._progress.cancel_requested.connect(self._on_cancel_clicked)
+        self._view_stack.addWidget(self._progress)
+
+        self._view_stack.addWidget(self._build_result_view())
 
         self._on_length_changed()
 
@@ -147,48 +144,6 @@ class RearrangePanel(BasePanel):
         layout.addWidget(self._start_button)
 
         layout.addStretch(1)
-        return view
-
-    # ---- loading view ---------------------------------------------------
-
-    def _build_loading_view(self) -> QWidget:
-        view = QWidget()
-        layout = QVBoxLayout(view)
-        layout.setContentsMargins(0, 60, 0, 0)
-        layout.setSpacing(16)
-        layout.addStretch(1)
-
-        title_row = QHBoxLayout()
-        title_row.setSpacing(10)
-        self._loading_icon = QLabel()
-        self._loading_icon.setPixmap(load_pixmap("loader-circle", ACCENT, 22))
-        title_row.addWidget(self._loading_icon)
-        title = QLabel("Searching for the correct order…")
-        title.setObjectName("DashboardTitle")
-        title_row.addWidget(title)
-        title_row.addStretch(1)
-        layout.addLayout(title_row)
-
-        self._loading_subtitle = QLabel()
-        self._loading_subtitle.setObjectName("DashboardSubtitle")
-        layout.addWidget(self._loading_subtitle)
-
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setRange(0, 0)  # indeterminate — btcrecover has no fine-grained
-        self._progress_bar.setTextVisible(False)
-        self._progress_bar.setFixedHeight(8)
-        layout.addWidget(self._progress_bar)
-
-        self._phase_label = QLabel()
-        self._phase_label.setObjectName("InfoNotice")
-        self._phase_label.setWordWrap(True)
-        layout.addWidget(self._phase_label)
-
-        cancel_button = QPushButton("Cancel Search")
-        cancel_button.clicked.connect(self._on_cancel_clicked)
-        layout.addWidget(cancel_button)
-
-        layout.addStretch(2)
         return view
 
     # ---- result view ---------------------------------------------------
@@ -296,9 +251,12 @@ class RearrangePanel(BasePanel):
             return
 
         self._refresh_estimate()
-        self._loading_subtitle.setText(self._estimate_label.text())
-        self._phase_label.setText("")
         self._view_stack.setCurrentIndex(1)
+        self._progress.start(
+            subtitle=self._estimate_label.text(),
+            summary_words=words,
+            target_summary=f"{self._token_combo.currentText()}  ·  {address}",
+        )
         self._start_search(spec)
 
     def _start_search(self, spec: RearrangementSpec) -> None:
@@ -307,34 +265,24 @@ class RearrangePanel(BasePanel):
         self._worker.finished.connect(self._on_recovery_finished)
         self._worker.failed.connect(self._on_recovery_failed)
         self._worker.start()
-        self._loading_rotation = 0
-        self._spinner_timer.start()
 
     def _on_cancel_clicked(self) -> None:
         if self._worker is not None:
             self._worker.cancel()
 
-    def _advance_spinner(self) -> None:
-        self._loading_rotation = (self._loading_rotation + 30) % 360
-        pixmap = load_pixmap("loader-circle", ACCENT, 22)
-        transform = QTransform().rotate(self._loading_rotation)
-        self._loading_icon.setPixmap(
-            pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)
-        )
-
     def _on_recovery_event(self, event) -> None:
         if event.kind == "phase":
-            self._phase_label.setText(event.message)
+            self._progress.set_phase(event.message)
         elif event.kind == "eta":
-            self._loading_subtitle.setText(event.message)
+            self._progress.set_subtitle(event.message)
 
     def _on_recovery_finished(self, result) -> None:
-        self._spinner_timer.stop()
+        self._progress.stop()
         self._cleanup_worker()
         self._show_result(result)
 
     def _on_recovery_failed(self, message: str) -> None:
-        self._spinner_timer.stop()
+        self._progress.stop()
         self._cleanup_worker()
         self._view_stack.setCurrentIndex(0)
         QMessageBox.critical(self, "Rearrangement failed to start", message)
