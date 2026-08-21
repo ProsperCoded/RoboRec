@@ -29,6 +29,17 @@ GPU_RATE_HIGH = 5_000_000
 
 _COLLAPSE_TO_AVERAGE_AFTER_DAYS = 30
 
+# (unit label, days per unit) — checked largest-first so a huge estimate lands on
+# "centuries"/"millennia" instead of an unreadable multi-digit day count (PRD 4.2's own
+# 4-missing-known-position case alone can run into the thousands of days).
+_DAY_UNITS: tuple[tuple[str, float], ...] = (
+    ("millennia", 365.25 * 1000),
+    ("centuries", 365.25 * 100),
+    ("decades", 365.25 * 10),
+    ("years", 365.25),
+    ("months", 30.44),
+)
+
 
 def estimate_minutes_range(combinations: float, *, use_gpu: bool) -> tuple[float, float]:
     """Returns (low, high) minutes for this many combinations on the given hardware."""
@@ -38,6 +49,20 @@ def estimate_minutes_range(combinations: float, *, use_gpu: bool) -> tuple[float
     low = combinations / rate_high / 60 / 2
     high = combinations / rate_low / 60
     return (max(low, 0.05), max(high, 0.05))
+
+
+def _format_days(days: float) -> str:
+    """Picks the largest whole unit (months/years/decades/centuries/millennia) that keeps
+    the displayed number readable, falling back to plain days for anything under a month.
+    Beyond ~1 million millennia even that unit produces an unreadable number (e.g. PRD 4.2's
+    explicitly-unsupported 5+ missing-word cases), so it switches to scientific notation."""
+    millennia = days / (365.25 * 1000)
+    if millennia >= 1_000_000:
+        return f"{millennia:.1e} millennia"
+    for label, days_per_unit in _DAY_UNITS:
+        if days >= days_per_unit:
+            return f"{days / days_per_unit:.1f} {label}"
+    return f"{days:.1f} days"
 
 
 def _format_span(low: float, high: float) -> str:
@@ -52,7 +77,7 @@ def _format_span(low: float, high: float) -> str:
         return f"{low_hours:.1f}–{high_hours:.1f} hrs"
     low_days, high_days = low_hours / 24, high_hours / 24
     if high_days > _COLLAPSE_TO_AVERAGE_AFTER_DAYS:
-        return f"~{(low_days + high_days) / 2:.0f} days (avg)"
+        return f"~{_format_days((low_days + high_days) / 2)} (avg)"
     return f"{low_days:.1f}–{high_days:.1f} days"
 
 

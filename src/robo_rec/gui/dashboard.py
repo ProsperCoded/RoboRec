@@ -29,7 +29,7 @@ class Dashboard(QWidget):
         layout.addWidget(title)
 
         subtitle = QLabel(
-            "Every recovery runs locally — nothing here ever leaves this machine."
+            "everything runs locally - nothing is stored/persisted"
         )
         subtitle.setObjectName("DashboardSubtitle")
         layout.addWidget(subtitle)

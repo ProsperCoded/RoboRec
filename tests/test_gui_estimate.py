@@ -41,9 +41,29 @@ def test_short_estimate_shows_a_range():
 
 def test_long_estimate_collapses_to_single_average():
     gpu_state.set_gpu_available(False)
-    text = format_estimate(2048**4)  # ~thousands of days on CPU
+    text = format_estimate(2048**4)  # ~years on CPU
     assert "–" not in text
     assert "avg" in text
+
+
+def test_long_estimate_uses_years_not_raw_days():
+    gpu_state.set_gpu_available(False)
+    text = format_estimate(2048**4)  # ~7.9 years on CPU
+    assert "years" in text
+    assert "days" not in text
+
+
+def test_very_long_estimate_uses_millennia():
+    gpu_state.set_gpu_available(False)
+    text = format_estimate(2048**5)  # ~16 thousand years on CPU
+    assert "millennia" in text
+
+
+def test_absurd_estimate_falls_back_to_scientific_notation():
+    gpu_state.set_gpu_available(False)
+    text = format_estimate(2048**12)  # nonsensically large, matches PRD's 5+ Non-Goal
+    assert "e+" in text
+    assert "millennia" in text
 
 
 def test_zero_combinations_is_instant():

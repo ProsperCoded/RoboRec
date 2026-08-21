@@ -22,7 +22,7 @@ _WALLET_TYPE_BY_COIN = {
 @dataclass(frozen=True)
 class CoinOption:
     label: str
-    coin: SupportedCoin | None  # None marks a not-yet-supported placeholder option
+    coin: SupportedCoin
     address_prefixes: tuple[str, ...] = ()
 
 
@@ -30,7 +30,6 @@ COIN_OPTIONS: tuple[CoinOption, ...] = (
     CoinOption("Bitcoin (BTC)", SupportedCoin.BITCOIN, ("1", "3", "bc1")),
     CoinOption("Ethereum (ETH)", SupportedCoin.ETHEREUM, ("0x",)),
     CoinOption("Solana (SOL)", SupportedCoin.SOLANA, ()),
-    CoinOption("Other BIP39-compatible", None, ()),
 )
 
 COIN_OPTION_LABELS: tuple[str, ...] = tuple(option.label for option in COIN_OPTIONS)

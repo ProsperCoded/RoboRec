@@ -143,22 +143,7 @@ def test_rearrange_panel_recovers_real_scramble_via_ui(qtbot):
     window.close()
 
 
-def test_unsupported_coin_shows_warning_instead_of_crashing(qtbot, monkeypatch):
-    from PySide6.QtWidgets import QMessageBox
 
-    window = MainWindow()
-    qtbot.addWidget(window)
-    panel = window._derive_wallet_panel
-
-    shown = []
-    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: shown.append(a)))
-
-    panel._seed_row.set_words(WORDS)
-    panel._token_combo.setCurrentText("Other BIP39-compatible")
-    panel._on_derive_clicked()
-
-    assert shown, "expected a warning dialog for the unsupported coin option"
-    window.close()
 
 
 def test_gpu_badge_click_navigates_to_gpu_status_panel(qtbot):
