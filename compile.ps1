@@ -1,23 +1,47 @@
-# Clean up previous build directories
-Write-Host "Cleaning up previous builds..." -ForegroundColor Cyan
-if (Test-Path dist) { Remove-Item -Recurse -Force dist }
-if (Test-Path main.exe) { Remove-Item -Force main.exe }
-if (Test-Path seedrecover.exe) { Remove-Item -Force seedrecover.exe }
+# Build RoboRec with Nuitka into a single Windows executable
+param(
+    [switch]$Clean = $true
+)
 
-Write-Host "Compiling Robo-Rec with Nuitka..." -ForegroundColor Cyan
-uv run python -m nuitka `
+$ErrorActionPreference = "Stop"
+
+$REPO_ROOT = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $REPO_ROOT
+
+Write-Host "🔨 Building RoboRec with Nuitka..." -ForegroundColor Green
+Write-Host "This will take 10-20 minutes on first build" -ForegroundColor Yellow
+Write-Host ""
+
+if ($Clean -and (Test-Path "dist")) {
+    Write-Host "Cleaning old build..." -ForegroundColor Gray
+    Remove-Item -Recurse -Force dist
+}
+
+Write-Host "Starting compilation..." -ForegroundColor Cyan
+& .venv\Scripts\python.exe -m nuitka `
   --onefile `
+  --follow-imports `
+  --include-package=robo_rec `
+  --include-package=bip_utils `
+  --include-package=coincurve `
+  --include-package=PySide6 `
   --windows-console-mode=disable `
-  --enable-plugin=pyside6 `
-  --main=src/robo_rec/main.py `
-  --main=vendor/btcrecover/seedrecover.py `
-  --include-data-dir=vendor/btcrecover/derivationpath-lists=vendor/btcrecover/derivationpath-lists `
-  --include-data-dir=vendor/btcrecover/btcrecover/wordlists=btcrecover/wordlists `
-  --include-data-dir=vendor/btcrecover/btcrecover/wordlists=vendor/btcrecover/wordlists `
-  --output-dir=dist
+  --output-dir=dist `
+  src/robo_rec/main.py
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Done! The compiled executables (main.exe and seedrecover.exe) are in the dist/ folder." -ForegroundColor Green
+    if (Test-Path "dist\main.exe") {
+        $size = (Get-Item "dist\main.exe").Length / 1MB
+        Write-Host ""
+        Write-Host "✓ Build successful!" -ForegroundColor Green
+        Write-Host "  Executable: dist\main.exe" -ForegroundColor Green
+        Write-Host "  Size: $([math]::Round($size, 1)) MB" -ForegroundColor Green
+        exit 0
+    } else {
+        Write-Host "✗ Build completed but main.exe not found" -ForegroundColor Red
+        exit 1
+    }
 } else {
-    Write-Host "Compilation failed!" -ForegroundColor Red
+    Write-Host "✗ Build failed with exit code $LASTEXITCODE" -ForegroundColor Red
+    exit $LASTEXITCODE
 }

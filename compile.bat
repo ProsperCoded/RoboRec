@@ -1,28 +1,45 @@
 @echo off
+REM Build RoboRec with Nuitka into a single Windows executable
 setlocal enabledelayedexpansion
 
-echo Cleaning up previous builds...
-if exist dist rmdir /s /q dist
-if exist main.exe del /q main.exe
-if exist seedrecover.exe del /q seedrecover.exe
+set "REPO_ROOT=%~dp0"
+cd /d "%REPO_ROOT%"
 
-echo Compiling Robo-Rec with Nuitka...
-uv run python -m nuitka ^
-  --onefile ^
-  --windows-console-mode=disable ^
-  --enable-plugin=pyside6 ^
-  --main=src/robo_rec/main.py ^
-  --main=vendor/btcrecover/seedrecover.py ^
-  --include-data-dir=vendor/btcrecover/derivationpath-lists=vendor/btcrecover/derivationpath-lists ^
-  --include-data-dir=vendor/btcrecover/btcrecover/wordlists=btcrecover/wordlists ^
-  --include-data-dir=vendor/btcrecover/btcrecover/wordlists=vendor/btcrecover/wordlists ^
-  --output-dir=dist
+echo.
+echo 🔨 Building RoboRec with Nuitka...
+echo This will take 10-20 minutes on first build
+echo.
 
-if %ERRORLEVEL% neq 0 (
-    echo Compilation failed!
-    pause
-    exit /b %ERRORLEVEL%
+if exist dist (
+    echo Cleaning old build...
+    rmdir /s /q dist
 )
 
-echo Done! The compiled executables (main.exe and seedrecover.exe) are in the dist\ folder.
-pause
+echo Starting compilation...
+call .venv\Scripts\python.exe -m nuitka ^
+  --onefile ^
+  --follow-imports ^
+  --include-package=robo_rec ^
+  --include-package=bip_utils ^
+  --include-package=coincurve ^
+  --include-package=PySide6 ^
+  --windows-console-mode=disable ^
+  --output-dir=dist ^
+  src/robo_rec/main.py
+
+if %errorlevel% equ 0 (
+    if exist dist\main.exe (
+        for /F "usebackq" %%A in ('powershell -Command "(Get-Item dist\main.exe).Length / 1MB | ForEach-Object { [Math]::Round($_, 1) }"') do set SIZE=%%A
+        echo.
+        echo ✓ Build successful!
+        echo   Executable: dist\main.exe
+        echo   Size: !SIZE! MB
+        exit /b 0
+    ) else (
+        echo ✗ Build completed but main.exe not found
+        exit /b 1
+    )
+) else (
+    echo ✗ Build failed with exit code %errorlevel%
+    exit /b %errorlevel%
+)
