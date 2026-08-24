@@ -26,6 +26,7 @@ Write-Host "Starting compilation on $numCores cores..." -ForegroundColor Cyan
   --include-package=bip_utils `
   --include-package=coincurve `
   --include-package=PySide6 `
+  --include-data-dir="src/robo_rec/gui/assets=robo_rec/gui/assets" `
   --windows-console-mode=disable `
   --jobs=$numCores `
   --lto=auto `
