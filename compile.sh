@@ -10,6 +10,9 @@ echo ""
 
 rm -rf dist
 
+# Get number of CPU cores for parallel compilation
+NUM_CORES=$(nproc 2>/dev/null || echo 4)
+
 .venv/bin/python -m nuitka \
   --onefile \
   --follow-imports \
@@ -18,16 +21,24 @@ rm -rf dist
   --include-package=coincurve \
   --include-package=PySide6 \
   --windows-console-mode=disable \
+  --jobs="$NUM_CORES" \
+  --lto=auto \
   --output-dir=dist \
   src/robo_rec/main.py
 
 if [ -f "dist/main.exe" ]; then
+  EXECUTABLE="dist/main.exe"
   SIZE=$(du -h dist/main.exe | cut -f1)
-  echo ""
-  echo "✓ Build successful!"
-  echo "  Executable: dist/main.exe"
-  echo "  Size: $SIZE"
+elif [ -f "dist/main.bin" ]; then
+  EXECUTABLE="dist/main.bin"
+  SIZE=$(du -h dist/main.bin | cut -f1)
 else
-  echo "✗ Build failed - main.exe not found"
+  echo "✗ Build failed - executable not found"
   exit 1
 fi
+
+echo ""
+echo "✓ Build successful!"
+echo "  Executable: $EXECUTABLE"
+echo "  Size: $SIZE"
+chmod +x "$EXECUTABLE"

@@ -15,7 +15,8 @@ if exist dist (
     rmdir /s /q dist
 )
 
-echo Starting compilation...
+for /f %%A in ('powershell -Command "(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors"') do set NUM_CORES=%%A
+echo Starting compilation on %NUM_CORES% cores...
 call .venv\Scripts\python.exe -m nuitka ^
   --onefile ^
   --follow-imports ^
@@ -24,6 +25,8 @@ call .venv\Scripts\python.exe -m nuitka ^
   --include-package=coincurve ^
   --include-package=PySide6 ^
   --windows-console-mode=disable ^
+  --jobs=%NUM_CORES% ^
+  --lto=auto ^
   --output-dir=dist ^
   src/robo_rec/main.py
 

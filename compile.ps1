@@ -17,7 +17,8 @@ if ($Clean -and (Test-Path "dist")) {
     Remove-Item -Recurse -Force dist
 }
 
-Write-Host "Starting compilation..." -ForegroundColor Cyan
+$numCores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+Write-Host "Starting compilation on $numCores cores..." -ForegroundColor Cyan
 & .venv\Scripts\python.exe -m nuitka `
   --onefile `
   --follow-imports `
@@ -26,6 +27,8 @@ Write-Host "Starting compilation..." -ForegroundColor Cyan
   --include-package=coincurve `
   --include-package=PySide6 `
   --windows-console-mode=disable `
+  --jobs=$numCores `
+  --lto=auto `
   --output-dir=dist `
   src/robo_rec/main.py
 
