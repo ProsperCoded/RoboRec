@@ -31,8 +31,8 @@ from robo_rec.recovery.models import (
     TypoCorrectionSpec,
 )
 from robo_rec.recovery.parser import parse_line
-from robo_rec.util.paths import btcrecover_root, seedrecover_script
-from robo_rec.util.process import python_executable, stream_lines
+from robo_rec.util.paths import btcrecover_root, seedrecover_command
+from robo_rec.util.process import stream_lines
 
 
 def _build_argv_and_tokenlist(
@@ -95,14 +95,14 @@ class BtcrecoverRunner:
         .result populated. Cleans up any generated tokenlist file on exit or cancellation."""
         argv, tokenlist_path = _build_argv_and_tokenlist(self._spec, use_gpu=self._use_gpu)
         self._tokenlist_path = tokenlist_path
-        full_argv = [python_executable(), str(seedrecover_script()), *argv]
+        full_argv = [*seedrecover_command(), *argv]
 
         try:
             process, lines = stream_lines(
                 full_argv, cwd=self._btcrecover_dir, stop_event=self._stop_event
             )
         except OSError as exc:
-            raise LaunchError(f"Failed to launch seedrecover.py: {exc}") from exc
+            raise LaunchError(f"Failed to launch seedrecover: {exc}") from exc
 
         # Assign self._process BEFORE yielding: cancel() reads self._process, and once
         # control returns to the caller after a yield, cancel() may be called immediately
