@@ -16,10 +16,13 @@ NUM_CORES=$(nproc 2>/dev/null || echo 4)
 .venv/bin/python -m nuitka \
   --onefile \
   --follow-imports \
+  --enable-plugin=pyside6 \
   --include-package=robo_rec \
   --include-package=bip_utils \
   --include-package=coincurve \
   --include-package=PySide6 \
+  --include-package=Crypto \
+  --include-package=py_crypto_hd_wallet \
   --include-data-dir="src/robo_rec/gui/assets=robo_rec/gui/assets" \
   --windows-console-mode=disable \
   --jobs="$NUM_CORES" \

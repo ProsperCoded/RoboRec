@@ -20,10 +20,13 @@ echo Starting compilation on %NUM_CORES% cores...
 call .venv\Scripts\python.exe -m nuitka ^
   --onefile ^
   --follow-imports ^
+  --enable-plugin=pyside6 ^
   --include-package=robo_rec ^
   --include-package=bip_utils ^
   --include-package=coincurve ^
   --include-package=PySide6 ^
+  --include-package=Crypto ^
+  --include-package=py_crypto_hd_wallet ^
   --include-data-dir="src/robo_rec/gui/assets=robo_rec/gui/assets" ^
   --windows-console-mode=disable ^
   --jobs=%NUM_CORES% ^
