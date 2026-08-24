@@ -28,6 +28,7 @@ call .venv\Scripts\python.exe -m nuitka ^
   --include-package=Crypto ^
   --include-package=py_crypto_hd_wallet ^
   --include-data-dir="src/robo_rec/gui/assets=robo_rec/gui/assets" ^
+  --include-data-dir="vendor=vendor" ^
   --windows-console-mode=disable ^
   --jobs=%NUM_CORES% ^
   --lto=auto ^

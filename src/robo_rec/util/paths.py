@@ -22,9 +22,21 @@ def is_compiled() -> bool:
 def repo_root() -> Path:
     """Resolve the project root by walking up from this file until pyproject.toml is found.
 
-    In compiled mode, returns the directory containing the executable.
+    In compiled mode, returns the directory where robo_rec package resides.
     """
     if is_compiled():
+        # In Nuitka onefile mode, __file__ points to a temp extracted location
+        # We need to find where the robo_rec package is within the onefile structure
+        here = Path(__file__).resolve()
+        # Walk up from util/paths.py -> util -> robo_rec and that's the package root
+        # The onefile extracts to a temp dir, so repo_root is essentially the temp base
+        for candidate in (here, *here.parents):
+            if (candidate / "vendor").is_dir() and (candidate / "vendor" / "btcrecover").is_dir():
+                return candidate
+            # Fallback: return parent of robo_rec package
+            if candidate.name == "robo_rec" and (candidate.parent / "vendor").is_dir():
+                return candidate.parent
+        # If all else fails, return the executable directory
         return Path(sys.executable).parent
 
     here = Path(__file__).resolve()
