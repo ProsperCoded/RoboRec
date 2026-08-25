@@ -25,6 +25,8 @@ def build():
         "--include-package=bip_utils",
         "--include-package=coincurve",
         "--include-package=PySide6",
+        "--include-data-dir=src/robo_rec/gui/assets=robo_rec/gui/assets",
+        "--windows-icon-from-ico=src/robo_rec/gui/assets/app-icon.ico",
         "--windows-console-mode=disable",
         "--output-dir=dist",
         str(repo_root / "src" / "robo_rec" / "main.py"),

@@ -25,6 +25,7 @@ NUM_CORES=$(nproc 2>/dev/null || echo 4)
   --include-package=py_crypto_hd_wallet \
   --include-data-dir="src/robo_rec/gui/assets=robo_rec/gui/assets" \
   --include-data-dir="vendor=vendor" \
+  --windows-icon-from-ico="src/robo_rec/gui/assets/app-icon.ico" \
   --windows-console-mode=disable \
   --jobs="$NUM_CORES" \
   --lto=auto \

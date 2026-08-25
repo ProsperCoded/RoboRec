@@ -20,6 +20,7 @@ def build():
         "--onefile",
         "--windowed",
         "--name=robo-rec",
+        f"--icon={repo_root / 'src' / 'robo_rec' / 'gui' / 'assets' / 'app-icon.ico'}",
         f"--distpath={dist / 'dist'}",
         f"--buildpath={dist / 'build'}",
         f"--specpath={dist}",
