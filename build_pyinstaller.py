@@ -21,6 +21,7 @@ def build():
         "--windowed",
         "--name=robo-rec",
         f"--icon={repo_root / 'src' / 'robo_rec' / 'gui' / 'assets' / 'app-icon.ico'}",
+        f"--add-data={repo_root / 'src' / 'robo_rec' / 'gui' / 'assets'}{';' if sys.platform == 'win32' else ':'}robo_rec/gui/assets",
         f"--distpath={dist / 'dist'}",
         f"--buildpath={dist / 'build'}",
         f"--specpath={dist}",
