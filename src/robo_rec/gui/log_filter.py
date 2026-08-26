@@ -18,9 +18,8 @@ def extract_log_from_event(event: RecoveryEvent) -> tuple[str | None, str]:
         return (f"• {event.message}", "info")
 
     elif kind == "phase":
-        if event.phase_current is not None and event.phase_total is not None:
-            return (f"Phase {event.phase_current}/{event.phase_total} — {event.message}", "progress")
-        return (f"• {event.message}", "info")
+        # event.message already includes "Phase N/M: ..." (see parser.py _PHASE_RE).
+        return (event.message, "progress")
 
     elif kind == "eta":
         return (event.message, "progress")
@@ -38,8 +37,9 @@ def extract_log_from_event(event: RecoveryEvent) -> tuple[str | None, str]:
         return (f"✗ ERROR: {message}", "error")
 
     elif kind == "log":
-        # Raw passthrough lines from the underlying btcrecover process.
-        line = event.raw_line or event.message
+        # Raw passthrough lines from the underlying btcrecover process that didn't
+        # match a more specific pattern (parser.py: parse_line's catch-all).
+        line = event.message
         if not line:
             return (None, "debug")
         return (line, "info")

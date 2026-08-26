@@ -329,6 +329,7 @@ class MissingWordsPanel(BasePanel):
         if terminal is not None:
             terminal.clear()
             terminal.show()
+            terminal.set_active(True)
             self._worker.event.connect(lambda event: self._log_event_to_terminal(event, terminal))
 
         self._worker.start()
@@ -374,6 +375,7 @@ class MissingWordsPanel(BasePanel):
     def _hide_terminal_sidebar(self) -> None:
         terminal = self._get_terminal_sidebar()
         if terminal is not None:
+            terminal.set_active(False)
             terminal.hide()
 
     def _cleanup_worker(self) -> None:

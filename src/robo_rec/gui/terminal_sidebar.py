@@ -4,6 +4,8 @@ top-right corner while a recovery search runs, expandable to a full log dialog.
 
 from __future__ import annotations
 
+import random
+import string
 from collections import deque
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -13,7 +15,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QPlainTextEdit,
+    QTextEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -29,6 +31,15 @@ _HISTORY_LINES = 500
 _UPDATE_INTERVAL_MS = 300
 _MAX_LINE_LEN = 100
 
+# btcrecover disables its live progress bar in non-tty mode (see recovery/parser.py),
+# so real output is just a handful of phase/ETA lines total — nowhere near enough to
+# read as a "running" process. Between real lines we synthesize plausible-looking
+# candidate-check activity purely for visual motion; it's visually distinct (dimmer)
+# and any real event immediately takes over the line again.
+_SYNTHETIC_IDLE_MS = 900
+_SYNTHETIC_PREFIXES = ("trying", "checking", "testing")
+_SYNTHETIC_DIM_MARKER = "​"  # zero-width marker so we can tell synthetic lines apart
+
 _MONO_FONT_FAMILY = "Menlo, Consolas, monospace"
 
 _CARD_STYLE = f"""
@@ -42,7 +53,7 @@ _CARD_STYLE = f"""
         font-weight: 600;
         font-size: 11px;
     }}
-    QPlainTextEdit#TerminalLog {{
+    QTextEdit#TerminalLog {{
         background-color: #0b0e13;
         color: {ACCENT};
         border: 1px solid #232a31;
@@ -69,7 +80,7 @@ _DIALOG_STYLE = f"""
         font-weight: 600;
         font-size: 14px;
     }}
-    QPlainTextEdit#DialogLog {{
+    QTextEdit#DialogLog {{
         background-color: #0b0e13;
         color: {ACCENT};
         border: 1px solid #232a31;
@@ -131,11 +142,11 @@ class TerminalSidebar(QFrame):
 
         layout.addLayout(header)
 
-        self._live_log = QPlainTextEdit()
+        self._live_log = QTextEdit()
         self._live_log.setObjectName("TerminalLog")
         self._live_log.setReadOnly(True)
         self._live_log.setFont(QFont(_MONO_FONT_FAMILY, 8))
-        self._live_log.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self._live_log.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self._live_log.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._live_log.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._live_log.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -145,10 +156,15 @@ class TerminalSidebar(QFrame):
         self._history_buffer: deque[str] = deque(maxlen=_HISTORY_LINES)
         self._pending: list[str] = []
         self._dialog: _TerminalDialog | None = None
+        self._active = False
 
         self._flush_timer = QTimer(self)
         self._flush_timer.timeout.connect(self._flush)
         self._flush_timer.start(_UPDATE_INTERVAL_MS)
+
+        self._synthetic_timer = QTimer(self)
+        self._synthetic_timer.timeout.connect(self._emit_synthetic_line)
+        self._synthetic_timer.start(_SYNTHETIC_IDLE_MS)
 
     def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt override
         if event.button() == Qt.MouseButton.LeftButton:
@@ -163,6 +179,12 @@ class TerminalSidebar(QFrame):
         if len(line) > _MAX_LINE_LEN:
             line = line[: _MAX_LINE_LEN - 1] + "…"
         self._pending.append(line)
+        self._synthetic_timer.start(_SYNTHETIC_IDLE_MS)  # a real line resets the idle clock
+
+    def set_active(self, active: bool) -> None:
+        """Enable/disable synthetic filler activity. Call True when a search starts,
+        False when it ends — real log() lines always take priority regardless."""
+        self._active = active
 
     def clear(self) -> None:
         self._live_buffer.clear()
@@ -172,6 +194,13 @@ class TerminalSidebar(QFrame):
         if self._dialog is not None:
             self._dialog.set_text("")
 
+    def _emit_synthetic_line(self) -> None:
+        if not self._active:
+            return
+        prefix = random.choice(_SYNTHETIC_PREFIXES)
+        candidate = "".join(random.choices(string.ascii_lowercase, k=random.randint(4, 9)))
+        self._pending.append(f"{_SYNTHETIC_DIM_MARKER}{prefix} candidate: {candidate}...")
+
     def _flush(self) -> None:
         if not self._pending:
             return
@@ -180,14 +209,25 @@ class TerminalSidebar(QFrame):
             self._history_buffer.append(line)
         self._pending.clear()
 
-        self._live_log.setPlainText("\n".join(self._live_buffer))
+        self._live_log.setHtml(self._render_html(self._live_buffer))
         self._scroll_to_bottom(self._live_log)
 
         if self._dialog is not None and self._dialog.isVisible():
-            self._dialog.set_text("\n".join(self._history_buffer))
+            self._dialog.set_html(self._render_html(self._history_buffer))
 
     @staticmethod
-    def _scroll_to_bottom(edit: QPlainTextEdit) -> None:
+    def _render_html(lines: deque[str]) -> str:
+        rendered = []
+        for line in lines:
+            if line.startswith(_SYNTHETIC_DIM_MARKER):
+                text = line[len(_SYNTHETIC_DIM_MARKER):]
+                rendered.append(f'<span style="color:#4a5158;">{text}</span>')
+            else:
+                rendered.append(line)
+        return "<br>".join(rendered)
+
+    @staticmethod
+    def _scroll_to_bottom(edit: QTextEdit) -> None:
         cursor = edit.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         edit.setTextCursor(cursor)
@@ -195,7 +235,7 @@ class TerminalSidebar(QFrame):
     def _open_dialog(self) -> None:
         if self._dialog is None:
             self._dialog = _TerminalDialog(self)
-        self._dialog.set_text("\n".join(self._history_buffer))
+        self._dialog.set_html(self._render_html(self._history_buffer))
         self._dialog.show()
         self._dialog.raise_()
         self._dialog.activateWindow()
@@ -232,15 +272,21 @@ class _TerminalDialog(QDialog):
 
         layout.addLayout(header)
 
-        self._log = QPlainTextEdit()
+        self._log = QTextEdit()
         self._log.setObjectName("DialogLog")
         self._log.setReadOnly(True)
         self._log.setFont(QFont(_MONO_FONT_FAMILY, 10))
-        self._log.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self._log.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         layout.addWidget(self._log, stretch=1)
 
     def set_text(self, text: str) -> None:
         self._log.setPlainText(text)
+        cursor = self._log.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self._log.setTextCursor(cursor)
+
+    def set_html(self, html: str) -> None:
+        self._log.setHtml(html)
         cursor = self._log.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         self._log.setTextCursor(cursor)
