@@ -325,10 +325,10 @@ class MissingWordsPanel(BasePanel):
         self._worker.finished.connect(self._on_recovery_finished)
         self._worker.failed.connect(self._on_recovery_failed)
 
-        # Wire up terminal sidebar logging
         terminal = self._get_terminal_sidebar()
         if terminal is not None:
             terminal.clear()
+            terminal.show()
             self._worker.event.connect(lambda event: self._log_event_to_terminal(event, terminal))
 
         self._worker.start()
@@ -344,7 +344,6 @@ class MissingWordsPanel(BasePanel):
         return None
 
     def _log_event_to_terminal(self, event, terminal: TerminalSidebar) -> None:
-        """Extract and log event to terminal sidebar."""
         line, level = extract_log_from_event(event)
         if line is not None:
             terminal.log(line, level)
@@ -361,14 +360,21 @@ class MissingWordsPanel(BasePanel):
 
     def _on_recovery_finished(self, result) -> None:
         self._progress.stop()
+        self._hide_terminal_sidebar()
         self._cleanup_worker()
         self._show_result(result)
 
     def _on_recovery_failed(self, message: str) -> None:
         self._progress.stop()
+        self._hide_terminal_sidebar()
         self._cleanup_worker()
         self._view_stack.setCurrentIndex(0)
         QMessageBox.critical(self, "Recovery failed to start", message)
+
+    def _hide_terminal_sidebar(self) -> None:
+        terminal = self._get_terminal_sidebar()
+        if terminal is not None:
+            terminal.hide()
 
     def _cleanup_worker(self) -> None:
         if self._worker is not None:

@@ -70,12 +70,6 @@ class MainWindow(QMainWindow):
         content_layout.setSpacing(0)
         root_layout.addWidget(content_area, stretch=1)
 
-        # Terminal sidebar on the right
-        self._terminal_sidebar = TerminalSidebar()
-        self._terminal_sidebar.setMaximumWidth(350)
-        self._terminal_sidebar.setMinimumWidth(200)
-        root_layout.addWidget(self._terminal_sidebar)
-
         content_layout.addWidget(self._build_top_bar())
 
         self._stack = AnimatedStackedWidget()
@@ -83,6 +77,11 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._stack, stretch=1)
 
         self._scroll_wrappers: dict[QWidget, QScrollArea] = {}
+
+        # Terminal output widget: floats above everything, anchored top-right
+        # of the whole window (not tied to any single panel).
+        self._terminal_sidebar = TerminalSidebar(central)
+        self._terminal_sidebar.hide()
 
         self._dashboard = Dashboard()
         self._dashboard.action_selected.connect(self._show_action)
@@ -118,6 +117,7 @@ class MainWindow(QMainWindow):
 
         self._show_dashboard()
         self._probe_gpu_for_badge()
+        self._reposition_terminal_widget()
 
     def _build_top_bar(self) -> QWidget:
         top_bar = QWidget()
@@ -151,6 +151,20 @@ class MainWindow(QMainWindow):
     def get_terminal_sidebar(self) -> TerminalSidebar:
         """Get the terminal sidebar for logging output."""
         return self._terminal_sidebar
+
+    def _reposition_terminal_widget(self) -> None:
+        """Anchor the terminal widget to the top-right corner of the window,
+        just below the top bar."""
+        margin = 16
+        top_bar_height = 56
+        x = self.centralWidget().width() - self._terminal_sidebar.width() - margin
+        y = top_bar_height + margin
+        self._terminal_sidebar.move(max(0, x), y)
+        self._terminal_sidebar.raise_()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        super().resizeEvent(event)
+        self._reposition_terminal_widget()
 
     def set_gpu_status(self, detected: bool) -> None:
         """Update the top-bar GPU badge and the process-wide GPU-availability cache that

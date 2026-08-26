@@ -3,6 +3,8 @@ not a sidebar tab (it's a one-off diagnostics view, not a recovery scenario)."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
@@ -24,8 +26,25 @@ class Sidebar(QWidget):
         layout.setContentsMargins(12, 20, 12, 16)
         layout.setSpacing(4)
 
-        brand = QLabel("ROBO-REC")
+        brand = QLabel()
         brand.setObjectName("SidebarBrand")
+
+        logo_path = Path(__file__).parent / "assets" / "app-icon.svg"
+        if logo_path.exists():
+            from PySide6.QtSvg import QSvgRenderer
+            from PySide6.QtGui import QPainter, QPixmap
+
+            renderer = QSvgRenderer(str(logo_path))
+            if renderer.isValid():
+                size = 36
+                pixmap = QPixmap(size, size)
+                pixmap.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+                brand.setPixmap(pixmap)
+        else:
+            brand.setText("ROBO-REC")
         layout.addWidget(brand)
 
         layout.addSpacing(20)
