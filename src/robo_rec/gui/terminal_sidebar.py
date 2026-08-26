@@ -173,11 +173,10 @@ class TerminalSidebar(QFrame):
 
     def log(self, line: str, level: str = "info") -> None:
         """Queue a log line. Filtering by level is expected to happen upstream
-        (see log_filter.extract_log_from_event); this just truncates and buffers."""
+        (see log_filter.extract_log_from_event). Lines are kept in full — only the
+        compact card view truncates them; the expanded dialog shows everything."""
         if not line:
             return
-        if len(line) > _MAX_LINE_LEN:
-            line = line[: _MAX_LINE_LEN - 1] + "…"
         self._pending.append(line)
         self._synthetic_timer.start(_SYNTHETIC_IDLE_MS)  # a real line resets the idle clock
 
@@ -209,21 +208,27 @@ class TerminalSidebar(QFrame):
             self._history_buffer.append(line)
         self._pending.clear()
 
-        self._live_log.setHtml(self._render_html(self._live_buffer))
+        self._live_log.setHtml(self._render_html(self._live_buffer, truncate=True))
         self._scroll_to_bottom(self._live_log)
 
         if self._dialog is not None and self._dialog.isVisible():
-            self._dialog.set_html(self._render_html(self._history_buffer))
+            self._dialog.set_html(self._render_html(self._history_buffer, truncate=False))
 
     @staticmethod
-    def _render_html(lines: deque[str]) -> str:
+    def _render_html(lines: deque[str], *, truncate: bool) -> str:
         rendered = []
         for line in lines:
-            if line.startswith(_SYNTHETIC_DIM_MARKER):
-                text = line[len(_SYNTHETIC_DIM_MARKER):]
+            is_synthetic = line.startswith(_SYNTHETIC_DIM_MARKER)
+            text = line[len(_SYNTHETIC_DIM_MARKER):] if is_synthetic else line
+            if truncate and len(text) > _MAX_LINE_LEN:
+                text = text[: _MAX_LINE_LEN - 1] + "…"
+            text = (
+                text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            )
+            if is_synthetic:
                 rendered.append(f'<span style="color:#4a5158;">{text}</span>')
             else:
-                rendered.append(line)
+                rendered.append(text)
         return "<br>".join(rendered)
 
     @staticmethod
@@ -235,7 +240,7 @@ class TerminalSidebar(QFrame):
     def _open_dialog(self) -> None:
         if self._dialog is None:
             self._dialog = _TerminalDialog(self)
-        self._dialog.set_html(self._render_html(self._history_buffer))
+        self._dialog.set_html(self._render_html(self._history_buffer, truncate=False))
         self._dialog.show()
         self._dialog.raise_()
         self._dialog.activateWindow()
@@ -276,7 +281,7 @@ class _TerminalDialog(QDialog):
         self._log.setObjectName("DialogLog")
         self._log.setReadOnly(True)
         self._log.setFont(QFont(_MONO_FONT_FAMILY, 10))
-        self._log.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        self._log.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         layout.addWidget(self._log, stretch=1)
 
     def set_text(self, text: str) -> None:
