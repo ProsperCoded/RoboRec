@@ -28,6 +28,7 @@ from robo_rec.gui.panels.missing_words import MissingWordsPanel
 from robo_rec.gui.panels.rearrange import RearrangePanel
 from robo_rec.gui.panels.typo_correction import TypoCorrectionPanel
 from robo_rec.gui.sidebar import Sidebar
+from robo_rec.gui.terminal_sidebar import TerminalSidebar
 from robo_rec.gui.theme import ACCENT, STYLESHEET, TEXT_SECONDARY
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
 
@@ -68,6 +69,12 @@ class MainWindow(QMainWindow):
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
         root_layout.addWidget(content_area, stretch=1)
+
+        # Terminal sidebar on the right
+        self._terminal_sidebar = TerminalSidebar()
+        self._terminal_sidebar.setMaximumWidth(350)
+        self._terminal_sidebar.setMinimumWidth(200)
+        root_layout.addWidget(self._terminal_sidebar)
 
         content_layout.addWidget(self._build_top_bar())
 
@@ -140,6 +147,10 @@ class MainWindow(QMainWindow):
 
         self.set_gpu_status(detected=False)
         return top_bar
+
+    def get_terminal_sidebar(self) -> TerminalSidebar:
+        """Get the terminal sidebar for logging output."""
+        return self._terminal_sidebar
 
     def set_gpu_status(self, detected: bool) -> None:
         """Update the top-bar GPU badge and the process-wide GPU-availability cache that

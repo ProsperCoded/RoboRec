@@ -35,7 +35,9 @@ from robo_rec.gui.coin_options import (
 from robo_rec.gui.estimate import format_estimate
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
+from robo_rec.gui.log_filter import extract_log_from_event
 from robo_rec.gui.recovery_worker import RecoveryWorker
+from robo_rec.gui.terminal_sidebar import TerminalSidebar
 from robo_rec.gui.theme import ACCENT
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
 from robo_rec.gui.widgets.copy_button import CopyButton
@@ -322,7 +324,30 @@ class MissingWordsPanel(BasePanel):
         self._worker.event.connect(self._on_recovery_event)
         self._worker.finished.connect(self._on_recovery_finished)
         self._worker.failed.connect(self._on_recovery_failed)
+
+        # Wire up terminal sidebar logging
+        terminal = self._get_terminal_sidebar()
+        if terminal is not None:
+            terminal.clear()
+            self._worker.event.connect(lambda event: self._log_event_to_terminal(event, terminal))
+
         self._worker.start()
+
+    def _get_terminal_sidebar(self) -> TerminalSidebar | None:
+        """Find the main window and get its terminal sidebar."""
+        from PySide6.QtWidgets import QApplication
+        from robo_rec.gui.main_window import MainWindow
+
+        for widget in QApplication.topLevelWidgets():
+            if isinstance(widget, MainWindow):
+                return widget.get_terminal_sidebar()
+        return None
+
+    def _log_event_to_terminal(self, event, terminal: TerminalSidebar) -> None:
+        """Extract and log event to terminal sidebar."""
+        line, level = extract_log_from_event(event)
+        if line is not None:
+            terminal.log(line, level)
 
     def _on_cancel_clicked(self) -> None:
         if self._worker is not None:

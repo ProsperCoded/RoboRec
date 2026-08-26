@@ -54,6 +54,7 @@ class RecoveryWorker(QObject):
     event = Signal(object)  # RecoveryEvent
     finished = Signal(object)  # RecoveryResult
     failed = Signal(str)  # error message, when the subprocess couldn't even launch
+    log_output = Signal(str, str)  # (line: str, level: str) for terminal display
 
     def __init__(self, spec: RecoverySpec, parent: QObject | None = None) -> None:
         super().__init__(parent)
