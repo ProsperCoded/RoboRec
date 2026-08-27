@@ -155,6 +155,11 @@ class DeriveWalletPanel(BasePanel):
             item = self._result_layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                # setParent(None) detaches (and hides) it immediately — deleteLater()
+                # alone only schedules the removal for a later event-loop pass, so the
+                # old widget would still be reachable/visible as a child of
+                # _result_group until then, right where the next derive's rows land.
+                widget.setParent(None)
                 widget.deleteLater()
 
     def _add_result_row(self, label: str, address: str, path: str | None) -> None:
