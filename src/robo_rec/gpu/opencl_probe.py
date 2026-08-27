@@ -28,10 +28,10 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from dataclasses import dataclass
 
 from robo_rec.util.paths import btcrecover_root
+from robo_rec.util.process import python_executable
 
 _TIMEOUT_SECONDS = 15
 
@@ -79,7 +79,7 @@ class OpenClProbeResult:
 
 
 def probe_opencl() -> OpenClProbeResult:
-    argv = [sys.executable, "-c", _DETECTION_SCRIPT]
+    argv = [python_executable(), "-c", _DETECTION_SCRIPT]
     try:
         completed = subprocess.run(
             argv,
