@@ -120,6 +120,7 @@ class RearrangePanel(BasePanel):
         self._seed_row = SeedRow(length=12, editable=True, lockable=True)
         self._seed_row.words_changed.connect(self._refresh_estimate)
         self._seed_row.locks_changed.connect(self._refresh_estimate)
+        self._seed_row.length_exceeded.connect(self._on_seed_row_length_exceeded)
         layout.addWidget(self._seed_row)
 
         target_group = QGroupBox("Test address")
@@ -198,6 +199,14 @@ class RearrangePanel(BasePanel):
         self._seed_row.set_length(length)
         self._infeasible_notice.setVisible(is_24)
         self._refresh_estimate()
+
+    def _on_seed_row_length_exceeded(self, words: list[str]) -> None:
+        """A paste had more words than the row currently fits — grow to 24 words
+        (the only longer supported length) and re-run the paste at the new size."""
+        if len(words) <= 12 or self._length_combo.currentIndex() == 1:
+            return
+        self._length_combo.setCurrentIndex(1)  # triggers _on_length_changed -> set_length(24)
+        self._seed_row.paste_all(words)
 
     def _on_address_changed(self, text: str) -> None:
         detected = detect_coin_label(text)

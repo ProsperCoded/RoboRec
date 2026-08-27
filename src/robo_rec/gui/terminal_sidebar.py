@@ -301,7 +301,7 @@ class TerminalSidebar(QFrame):
                 text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             )
             if is_synthetic:
-                rendered.append(f'<span style="color:#4a5158;">{text}</span>')
+                rendered.append(f'<span style="color:#e8ecef;">{text}</span>')
             else:
                 rendered.append(text)
         return "<br>".join(rendered)
