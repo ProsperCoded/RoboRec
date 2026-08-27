@@ -1,24 +1,67 @@
-"""Probes OpenCL GPU availability via seedrecover.py --opencl-info.
+"""Probes OpenCL GPU availability by calling btcrecover's own detection function,
+btcrpass.get_opencl_devices(), instead of parsing seedrecover.py --opencl-info's
+human-readable text output.
 
-Confirmed on this dev machine (no discrete GPU, pyopencl not installed): btcrecover's
---opencl-info handler doesn't guard against pyopencl being unavailable and raises a bare
-NameError (vendor/btcrecover/btcrecover/btcrseed.py line ~4877 calls opencl_information()
-without checking the module_opencl_available flag set at import time, line ~81-88) instead of
-printing a clean "not available" message. This is a real upstream bug, not something worth
-patching here (unlike the --listseeds fix in robo-rec-implementation.md, this doesn't block a
-PRD-required feature — it just means we must not assume a clean stderr on failure) — this
-probe treats any non-zero exit or parse failure as "OpenCL unavailable" rather than raising.
+Why not --opencl-info: btcrecover's own test suite (btcrecover/test/test_seeds.py's
+has_any_opencl_devices(), which gates every OpenCL_Tests case) uses
+btcrpass.get_opencl_devices() directly — not --opencl-info — as the canonical way to
+detect a usable OpenCL setup. That function is a real, filtered device query
+(pyopencl.get_platforms() -> get_devices(), keeping only devices where
+d.available == 1, d.profile == "FULL_PROFILE", d.endian_little == 1) with its own
+narrow exception handling: a missing pyopencl install is a caught ImportError, and
+"no OpenCL platform found" is a caught pyopencl.LogicError — both return an empty
+list cleanly. --opencl-info's own handler has no such guard (vendor/btcrecover/
+btcrecover/btcrseed.py's opencl_information() call isn't gated by the
+module_opencl_available flag set at import time) and raises a bare NameError when
+pyopencl isn't installed, so scraping its stdout means treating a real upstream crash
+as just another "empty output" case, and parsing device names/IDs out of
+human-readable text whose exact format was never confirmed against real hardware.
+
+This probe instead runs a small script that imports btcrpass (the same module
+seedrecover.py itself already imports for every real run, so this carries no
+additional import risk) and calls get_opencl_devices() directly, printing the result
+as JSON. It's still run in a subprocess — not imported in-process — so a pyopencl
+driver crash during device enumeration can't take down the GUI process itself.
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 from dataclasses import dataclass
 
-from robo_rec.util.paths import btcrecover_root, seedrecover_script
-from robo_rec.util.process import python_executable
+from robo_rec.util.paths import btcrecover_root
 
 _TIMEOUT_SECONDS = 15
+
+# Run from btcrecover_root as cwd (matches how seedrecover.py itself is always
+# launched elsewhere in this codebase — see util/paths.py), so
+# `from btcrecover import btcrpass` resolves the same way it does for a real
+# recovery run (seedrecover.py itself does `from btcrecover import btcrseed`).
+_DETECTION_SCRIPT = """
+import json, sys
+try:
+    from btcrecover import btcrpass
+except Exception as exc:
+    print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
+    sys.exit(0)
+
+try:
+    devices = btcrpass.get_opencl_devices()
+except Exception as exc:
+    print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
+    sys.exit(0)
+
+result = []
+for i, d in enumerate(devices):
+    try:
+        platform_name = d.platform.name
+    except Exception:
+        platform_name = "unknown"
+    result.append({"platform": platform_name, "index": i, "name": d.name})
+print(json.dumps({"ok": True, "devices": result}))
+"""
 
 
 @dataclass(frozen=True)
@@ -36,7 +79,7 @@ class OpenClProbeResult:
 
 
 def probe_opencl() -> OpenClProbeResult:
-    argv = [python_executable(), str(seedrecover_script()), "--opencl-info"]
+    argv = [sys.executable, "-c", _DETECTION_SCRIPT]
     try:
         completed = subprocess.run(
             argv,
@@ -50,34 +93,42 @@ def probe_opencl() -> OpenClProbeResult:
         return OpenClProbeResult(available=False, devices=[], error=str(exc))
 
     if completed.returncode != 0:
-        # e.g. pyopencl not installed, or no OpenCL platforms present on this machine. The
-        # stderr is often a full Python traceback (confirmed on this dev machine — see
-        # module docstring); only the last non-empty line is kept as a human-readable summary.
         stderr_lines = [ln for ln in completed.stderr.strip().splitlines() if ln.strip()]
-        summary = stderr_lines[-1].strip() if stderr_lines else None
+        summary = stderr_lines[-1].strip() if stderr_lines else f"exit code {completed.returncode}"
         return OpenClProbeResult(available=False, devices=[], error=summary)
 
-    devices = _parse_devices(completed.stdout)
+    return _parse_result(completed.stdout)
+
+
+def _parse_result(stdout: str) -> OpenClProbeResult:
+    try:
+        payload = json.loads(stdout.strip().splitlines()[-1]) if stdout.strip() else None
+    except (json.JSONDecodeError, IndexError):
+        payload = None
+
+    if not payload:
+        return OpenClProbeResult(available=False, devices=[], error="No output from OpenCL probe script")
+
+    if not payload.get("ok"):
+        return OpenClProbeResult(available=False, devices=[], error=payload.get("error"))
+
+    # get_opencl_devices() returns a flat list across all platforms (pyopencl.Device
+    # has no numeric platform id, only a name) — derive platform_id here by first
+    # appearance order, so devices on the same platform share an id without
+    # fabricating one.
+    platform_ids: dict[str, int] = {}
+    devices: list[OpenClDeviceInfo] = []
+    for entry in payload.get("devices", []):
+        platform_name = entry.get("platform", "")
+        platform_id = platform_ids.setdefault(platform_name, len(platform_ids))
+        devices.append(
+            OpenClDeviceInfo(
+                platform_id=platform_id,
+                device_id=entry.get("index", 0),
+                name=entry.get("name", "Unknown device"),
+            )
+        )
     return OpenClProbeResult(available=bool(devices), devices=devices, error=None)
 
 
-def _parse_devices(output: str) -> list[OpenClDeviceInfo]:
-    """Best-effort parse of opencl_information's printed device list. Format has not been
-    observed on real hardware yet (no discrete GPU on the dev machine) — this must be
-    re-verified against real --opencl-info output on the Windows VM / client hardware
-    (see robo-rec-prd.md Section 6.3) and made more tolerant of format drift then."""
-    devices: list[OpenClDeviceInfo] = []
-    platform_id = -1
-    device_id = -1
-    for line in output.splitlines():
-        stripped = line.strip()
-        if stripped.lower().startswith("platform"):
-            platform_id += 1
-            device_id = -1
-        elif stripped.lower().startswith("device") and ":" in stripped:
-            device_id += 1
-            name = stripped.split(":", 1)[1].strip()
-            devices.append(
-                OpenClDeviceInfo(platform_id=max(platform_id, 0), device_id=device_id, name=name)
-            )
-    return devices
+__all__ = ["OpenClDeviceInfo", "OpenClProbeResult", "probe_opencl"]
