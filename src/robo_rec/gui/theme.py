@@ -401,6 +401,15 @@ QPushButton#PrimaryButton:disabled {{
     font-size: 12px;
 }}
 
+#DangerNotice {{
+    background-color: {SURFACE_RAISED};
+    border: 1px solid {DANGER};
+    border-radius: 8px;
+    color: {DANGER};
+    padding: 10px 12px;
+    font-size: 12px;
+}}
+
 QProgressBar {{
     background-color: {SURFACE_RAISED};
     border: 1px solid {BORDER};

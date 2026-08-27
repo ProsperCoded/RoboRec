@@ -32,7 +32,7 @@ from robo_rec.gui.coin_options import (
     detect_coin_label,
     wallet_type_for_coin,
 )
-from robo_rec.gui.estimate import format_estimate
+from robo_rec.gui.estimate import format_estimate, is_estimate_impractical
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.log_filter import extract_log_from_event
@@ -274,15 +274,20 @@ class MissingWordsPanel(BasePanel):
         else:
             self._warning_label.hide()
 
+        impractical = False
         if missing == 0:
             estimate_text = "Fill in at least one blank to see a time estimate."
         else:
             combinations = combinations_for(total, missing, known_position=known_position)
+            impractical = is_estimate_impractical(combinations)
             estimate_text = (
                 f"Estimated time: {format_estimate(combinations)} "
                 f"(based on {missing} missing word(s))"
             )
         self._estimate_label.setText(estimate_text)
+        self._estimate_label.setObjectName("DangerNotice" if impractical else "InfoNotice")
+        self._estimate_label.style().unpolish(self._estimate_label)
+        self._estimate_label.style().polish(self._estimate_label)
 
         self._start_button.setEnabled(0 < missing <= limit)
 

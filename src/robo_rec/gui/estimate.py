@@ -87,3 +87,14 @@ def format_estimate(combinations: float) -> str:
     low, high = estimate_minutes_range(combinations, use_gpu=use_gpu)
     hardware_label = "with a GPU" if use_gpu else "on CPU"
     return f"{_format_span(low, high)} {hardware_label}"
+
+
+def is_estimate_impractical(combinations: float) -> bool:
+    """True once the high end of the range has collapsed into the single-average
+    days/months/years/millennia display — i.e. the same threshold _format_span uses
+    to give up on a low-high range, past which this isn't a realistically runnable
+    search on the user's own hardware."""
+    use_gpu = is_gpu_available()
+    _, high = estimate_minutes_range(combinations, use_gpu=use_gpu)
+    high_days = high / 60 / 24
+    return high_days > _COLLAPSE_TO_AVERAGE_AFTER_DAYS

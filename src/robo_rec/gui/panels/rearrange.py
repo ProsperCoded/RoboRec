@@ -32,7 +32,7 @@ from robo_rec.gui.coin_options import (
     detect_coin_label,
     wallet_type_for_coin,
 )
-from robo_rec.gui.estimate import format_estimate
+from robo_rec.gui.estimate import format_estimate, is_estimate_impractical
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.recovery_worker import RecoveryWorker
@@ -224,6 +224,10 @@ class RearrangePanel(BasePanel):
             f"Estimated time: {format_estimate(combinations)} "
             f"(based on {scrambled_count} scrambled word(s))"
         )
+        impractical = is_estimate_impractical(combinations)
+        self._estimate_label.setObjectName("DangerNotice" if impractical else "InfoNotice")
+        self._estimate_label.style().unpolish(self._estimate_label)
+        self._estimate_label.style().polish(self._estimate_label)
 
     def _on_proceed_clicked(self) -> None:
         address = self._address_field.text().strip()
