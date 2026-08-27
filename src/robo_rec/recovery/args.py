@@ -25,6 +25,7 @@ result and passes it in.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from robo_rec.recovery.models import (
@@ -35,7 +36,13 @@ from robo_rec.recovery.models import (
 )
 from robo_rec.recovery.tokenlist import build_tokenlist_file
 
-_COMMON_FLAGS = ["--no-gui", "--dsw"]
+# btcrecover defaults --threads to the full logical core count, which pegs every core at
+# 100% for the run's whole duration (hours, per PRD 4.1/4.2) and can starve the OS/GUI badly
+# enough to crash the system. Reserve one logical core so the machine stays responsive;
+# btcrecover only ever lowers this further itself (e.g. by VRAM budget on GPU), never raises it.
+_WORKER_THREADS = max(1, (os.cpu_count() or 1) - 1)
+
+_COMMON_FLAGS = ["--no-gui", "--dsw", "--threads", str(_WORKER_THREADS)]
 
 
 def _gpu_flags(use_gpu: bool) -> list[str]:

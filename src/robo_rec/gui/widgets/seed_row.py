@@ -22,6 +22,10 @@ class SeedRow(QWidget):
 
     words_changed = Signal()
     locks_changed = Signal()
+    # Emitted with the full pasted word list when it has more words than the row
+    # currently has tiles for (e.g. a 24-word phrase pasted while set to 12 words).
+    # Panels connect this to grow their length setting and re-run paste_all().
+    length_exceeded = Signal(list)
 
     def __init__(
         self,
@@ -86,11 +90,30 @@ class SeedRow(QWidget):
         if self._tiles:
             self._tiles[0].focus_word_field()
 
+    def paste_all(self, words: list[str]) -> None:
+        """Fill tiles from `words` starting at index 0, focusing the tile after the
+        last word placed (or the last tile, if the phrase fills the row)."""
+        for i, word in enumerate(words):
+            if i >= len(self._tiles):
+                break
+            self._tiles[i].set_word(word)
+        next_index = min(len(words), len(self._tiles) - 1)
+        if 0 <= next_index < len(self._tiles):
+            self._tiles[next_index].focus_word_field()
+
     def _on_paste_overflow(self, index: int, remaining_words: list[str]) -> None:
+        total_pasted = index + 1 + len(remaining_words)
+        if total_pasted > len(self._tiles):
+            # Doesn't fit at the current length (e.g. a 24-word phrase pasted while
+            # still set to 12 words) — surface the words already in earlier tiles
+            # plus the whole paste, so the panel can grow the row and redo the paste
+            # from position 0, rather than silently truncating the phrase.
+            words_before = [tile.word() for tile in self._tiles[:index]]
+            pasted_words = [*words_before, self._tiles[index].word(), *remaining_words]
+            self.length_exceeded.emit(pasted_words)
+            return
         for offset, word in enumerate(remaining_words, start=1):
             target_index = index + offset
-            if target_index >= len(self._tiles):
-                break
             self._tiles[target_index].set_word(word)
         next_index = min(index + len(remaining_words) + 1, len(self._tiles) - 1)
         if 0 <= next_index < len(self._tiles):

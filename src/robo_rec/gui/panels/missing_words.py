@@ -147,6 +147,7 @@ class MissingWordsPanel(BasePanel):
 
         self._seed_row = SeedRow(length=12, editable=True)
         self._seed_row.words_changed.connect(self._refresh_missing_count)
+        self._seed_row.length_exceeded.connect(self._on_seed_row_length_exceeded)
         layout.addWidget(self._seed_row)
 
         target_group = QGroupBox("Test address")
@@ -188,15 +189,19 @@ class MissingWordsPanel(BasePanel):
         self._result_icon = QLabel()
         title_row.addWidget(self._result_icon)
         self._result_title = QLabel()
-        self._result_title.setObjectName("DashboardTitle")
         title_row.addWidget(self._result_title)
         title_row.addStretch(1)
         layout.addLayout(title_row)
 
         self._result_subtitle = QLabel()
-        self._result_subtitle.setObjectName("DashboardSubtitle")
         self._result_subtitle.setWordWrap(True)
         layout.addWidget(self._result_subtitle)
+
+        self._seed_card = QWidget()
+        self._seed_card.setObjectName("SuccessSeedCard")
+        seed_card_layout = QVBoxLayout(self._seed_card)
+        seed_card_layout.setContentsMargins(20, 16, 20, 20)
+        seed_card_layout.setSpacing(12)
 
         seed_header = QHBoxLayout()
         seed_label = QLabel("SEED PHRASE")
@@ -205,10 +210,12 @@ class MissingWordsPanel(BasePanel):
         seed_header.addStretch(1)
         self._copy_button = CopyButton()
         seed_header.addWidget(self._copy_button)
-        layout.addLayout(seed_header)
+        seed_card_layout.addLayout(seed_header)
 
         self._result_row = SeedRow(length=12, editable=False)
-        layout.addWidget(self._result_row)
+        seed_card_layout.addWidget(self._result_row)
+
+        layout.addWidget(self._seed_card)
 
         again_button = QPushButton("Start Another Recovery")
         again_button.clicked.connect(self._reset_to_form)
@@ -222,6 +229,15 @@ class MissingWordsPanel(BasePanel):
     def _on_length_changed(self) -> None:
         length = 12 if self._length_combo.currentIndex() == 0 else 24
         self._seed_row.set_length(length)
+        self._refresh_missing_count()
+
+    def _on_seed_row_length_exceeded(self, words: list[str]) -> None:
+        """A paste had more words than the row currently fits — grow to 24 words
+        (the only longer supported length) and re-run the paste at the new size."""
+        if len(words) <= 12 or self._length_combo.currentIndex() == 1:
+            return
+        self._length_combo.setCurrentIndex(1)  # triggers _on_length_changed -> set_length(24)
+        self._seed_row.paste_all(words)
         self._refresh_missing_count()
 
     def _on_address_changed(self, text: str) -> None:
@@ -392,11 +408,14 @@ class MissingWordsPanel(BasePanel):
 
     def _show_result(self, result) -> None:
         if result.succeeded and result.mnemonic:
-            self._result_icon.setPixmap(load_pixmap("party-popper", ACCENT, 22))
+            self._result_icon.setPixmap(load_pixmap("party-popper", ACCENT, 32))
             self._result_title.setText("Recovered your seed phrase")
+            self._result_title.setObjectName("ResultTitleSuccess")
             self._result_subtitle.setText(
                 "Every word below matches a valid, address-verified phrase."
             )
+            self._result_subtitle.setObjectName("ResultSubtitleSuccess")
+            self._seed_card.setObjectName("SuccessSeedCard")
             words = result.mnemonic.split()
             self._result_row.set_length(len(words))
             self._result_row.set_words(words)
@@ -405,13 +424,21 @@ class MissingWordsPanel(BasePanel):
         else:
             self._result_icon.setPixmap(load_pixmap("loader-circle", ACCENT, 22))
             self._result_title.setText("No matching phrase found")
+            self._result_title.setObjectName("DashboardTitle")
             self._result_subtitle.setText(
                 "Robo-Rec searched every combination in this range and none matched the "
                 "test address. Double-check the address and the words you entered."
             )
+            self._result_subtitle.setObjectName("DashboardSubtitle")
+            self._seed_card.setObjectName("")
             self._result_row.set_length(len(self._seed_row.tiles()))
             self._result_row.set_words(self._seed_row.words())
             self._copy_button.setVisible(False)
+
+        for widget in (self._result_title, self._result_subtitle, self._seed_card):
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+
         self._view_stack.setCurrentIndex(2)
 
     def _reset_to_form(self) -> None:

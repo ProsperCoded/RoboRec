@@ -5,7 +5,6 @@ top-right corner while a recovery search runs, expandable to a full log dialog.
 from __future__ import annotations
 
 import random
-import string
 from collections import deque
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -28,17 +27,95 @@ _CARD_WIDTH = 300
 _CARD_HEIGHT = 130
 _LIVE_LINES = 8
 _HISTORY_LINES = 500
-_UPDATE_INTERVAL_MS = 300
+_UPDATE_INTERVAL_MS = 100
 _MAX_LINE_LEN = 100
 
 # btcrecover disables its live progress bar in non-tty mode (see recovery/parser.py),
 # so real output is just a handful of phase/ETA lines total — nowhere near enough to
 # read as a "running" process. Between real lines we synthesize plausible-looking
 # candidate-check activity purely for visual motion; it's visually distinct (dimmer)
-# and any real event immediately takes over the line again.
-_SYNTHETIC_IDLE_MS = 900
-_SYNTHETIC_PREFIXES = ("trying", "checking", "testing")
+# and any real event immediately takes over the line again. Full, untruncated
+# candidate phrases are shown — a handful of real BIP39 words, not a cut-off fragment.
+_SYNTHETIC_IDLE_MS = 100
 _SYNTHETIC_DIM_MARKER = "​"  # zero-width marker so we can tell synthetic lines apart
+_SYNTHETIC_WORDLIST = (
+    "abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract",
+    "absurd", "abuse", "access", "accident", "account", "accuse", "achieve", "acid",
+    "acoustic", "acquire", "across", "act", "action", "actor", "actress", "actual",
+    "adapt", "add", "addict", "address", "adjust", "admit", "adult", "advance",
+    "advice", "aerobic", "affair", "afford", "afraid", "again", "age", "agent",
+    "agree", "ahead", "aim", "air", "airport", "aisle", "alarm", "album", "alcohol",
+    "alert", "alien", "all", "alley", "allow", "almost", "alone", "alpha", "already",
+    "also", "alter", "always", "amateur", "amazing", "among", "amount", "amused",
+    "analyst", "anchor", "ancient", "anger", "angle", "angry", "animal", "ankle",
+    "announce", "annual", "another", "answer", "antenna", "antique", "anxiety",
+    "any", "apart", "apology", "appear", "apple", "approve", "april", "arch",
+    "arctic", "area", "arena", "argue", "arm", "armed", "armor", "army", "around",
+    "arrange", "arrest", "arrive", "arrow", "art", "artefact", "artist", "artwork",
+    "ask", "aspect", "assault", "asset", "assist", "assume", "asthma", "athlete",
+    "atom", "attack", "attend", "attitude", "attract", "auction", "audit", "august",
+    "aunt", "author", "auto", "autumn", "average", "avocado", "avoid", "awake",
+    "aware", "away", "awesome", "awful", "awkward", "axis", "baby", "bachelor",
+    "bacon", "badge", "bag", "balance", "balcony", "ball", "bamboo", "banana",
+    "banner", "bar", "barely", "bargain", "barrel", "base", "basic", "basket",
+)
+
+_ADDRESS_CHARS = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def _random_candidate_phrase() -> str:
+    words = random.sample(_SYNTHETIC_WORDLIST, k=random.randint(3, 6))
+    return " ".join(words)
+
+
+def _random_address() -> str:
+    body = "".join(random.choices(_ADDRESS_CHARS, k=random.randint(30, 33)))
+    return f"1{body}"
+
+
+def _random_derivation_path() -> str:
+    account = random.randint(0, 3)
+    index = random.randint(0, 40)
+    return f"m/44'/0'/{account}'/0/{index}"
+
+
+def _emit_synthetic_candidate() -> str:
+    prefix = random.choice(("trying", "checking", "testing", "verifying"))
+    return f"{prefix} candidate: {_random_candidate_phrase()}"
+
+
+def _emit_synthetic_derive() -> str:
+    return f"deriving address at {_random_derivation_path()}"
+
+
+def _emit_synthetic_hash() -> str:
+    action = random.choice(("hashing", "computing checksum for", "deriving key from"))
+    return f"{action} candidate seed"
+
+
+def _emit_synthetic_compare() -> str:
+    return f"comparing against target address {_random_address()[:14]}…"
+
+
+def _emit_synthetic_rate() -> str:
+    rate = random.randint(800, 6400)
+    return f"~{rate:,} candidates/sec"
+
+
+_SYNTHETIC_LINE_GENERATORS = (
+    _emit_synthetic_candidate,
+    _emit_synthetic_candidate,
+    _emit_synthetic_candidate,
+    _emit_synthetic_derive,
+    _emit_synthetic_hash,
+    _emit_synthetic_compare,
+    _emit_synthetic_rate,
+)
+
+
+def _random_synthetic_line() -> str:
+    generator = random.choice(_SYNTHETIC_LINE_GENERATORS)
+    return generator()
 
 _MONO_FONT_FAMILY = "Menlo, Consolas, monospace"
 
@@ -196,9 +273,7 @@ class TerminalSidebar(QFrame):
     def _emit_synthetic_line(self) -> None:
         if not self._active:
             return
-        prefix = random.choice(_SYNTHETIC_PREFIXES)
-        candidate = "".join(random.choices(string.ascii_lowercase, k=random.randint(4, 9)))
-        self._pending.append(f"{_SYNTHETIC_DIM_MARKER}{prefix} candidate: {candidate}...")
+        self._pending.append(f"{_SYNTHETIC_DIM_MARKER}{_random_synthetic_line()}")
 
     def _flush(self) -> None:
         if not self._pending:

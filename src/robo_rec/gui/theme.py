@@ -129,6 +129,24 @@ QMainWindow, #ContentArea {{
     color: {TEXT_SECONDARY};
 }}
 
+/* ---- Recovery result: success ---- */
+#ResultTitleSuccess {{
+    font-size: 28px;
+    font-weight: 700;
+    color: {ACCENT};
+}}
+
+#ResultSubtitleSuccess {{
+    font-size: 14px;
+    color: {TEXT_PRIMARY};
+}}
+
+#SuccessSeedCard {{
+    background-color: {ACCENT_DIM};
+    border: 1px solid {ACCENT};
+    border-radius: 14px;
+}}
+
 /* ---- Action card ---- */
 ActionCard {{
     background-color: {SURFACE};

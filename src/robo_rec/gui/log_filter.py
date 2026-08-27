@@ -26,15 +26,14 @@ def extract_log_from_event(event: RecoveryEvent) -> tuple[str | None, str]:
 
     elif kind == "found":
         mnemonic = event.result.mnemonic if event.result else None
-        seed = (mnemonic[:20] + "...") if mnemonic else "???"
+        seed = mnemonic if mnemonic else event.message
         return (f"✓ FOUND: {seed}", "found")
 
     elif kind == "not_found":
         return (f"• {event.message}", "info")
 
     elif kind == "error":
-        message = (event.message or "Unknown error")[:80]
-        return (f"✗ ERROR: {message}", "error")
+        return (f"✗ ERROR: {event.message or 'Unknown error'}", "error")
 
     elif kind == "log":
         # Raw passthrough lines from the underlying btcrecover process that didn't
