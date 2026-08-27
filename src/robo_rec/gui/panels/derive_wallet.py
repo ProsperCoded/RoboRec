@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from robo_rec.derivation import derive_addresses, verify_address
@@ -123,10 +124,7 @@ class DeriveWalletPanel(BasePanel):
 
         target = self._address_field.text().strip()
 
-        while self._result_layout.count():
-            item = self._result_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        self._clear_results()
 
         if target:
             match = verify_address(mnemonic, target, coin=coin)
@@ -148,8 +146,21 @@ class DeriveWalletPanel(BasePanel):
 
         self._result_group.setVisible(True)
 
+    def _clear_results(self) -> None:
+        """Removes every previous result row. Each row is a QWidget (see
+        _add_result_row), so takeAt(0).widget() reliably catches it — a bare
+        sub-layout wouldn't be, and its child widgets would leak on screen
+        underneath the next derive's results."""
+        while self._result_layout.count():
+            item = self._result_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
     def _add_result_row(self, label: str, address: str, path: str | None) -> None:
-        row = QVBoxLayout()
+        row_widget = QWidget()
+        row = QVBoxLayout(row_widget)
+        row.setContentsMargins(0, 0, 0, 0)
         label_widget = QLabel(label)
         label_widget.setObjectName("SectionLabel")
         row.addWidget(label_widget)
@@ -167,4 +178,4 @@ class DeriveWalletPanel(BasePanel):
             path_label.setObjectName("InfoNotice")
             row.addWidget(path_label)
 
-        self._result_layout.addLayout(row)
+        self._result_layout.addWidget(row_widget)
