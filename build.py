@@ -25,6 +25,8 @@ def build():
         "--include-package=bip_utils",
         "--include-package=coincurve",
         "--include-package=PySide6",
+        "--include-package=numpy",
+        "--include-package=pyopencl",
         "--include-data-dir=src/robo_rec/gui/assets=robo_rec/gui/assets",
         "--windows-icon-from-ico=src/robo_rec/gui/assets/app-icon.ico",
         "--windows-console-mode=disable",
@@ -32,9 +34,9 @@ def build():
         str(repo_root / "src" / "robo_rec" / "main.py"),
     ]
 
-    print(f"Building with Nuitka...")
-    print(f"This may take 10-20 minutes on first build...\n")
-    result = subprocess.run(cmd, cwd=repo_root)
+    print("Building with Nuitka...")
+    print("This may take 10-20 minutes on first build...\n")
+    result = subprocess.run(cmd, cwd=repo_root, check=False)
 
     if result.returncode == 0:
         exe_path = dist / "main.exe"

@@ -28,40 +28,23 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import dataclass
 
-from robo_rec.util.paths import btcrecover_root
+from robo_rec.util.paths import btcrecover_root, is_compiled
 from robo_rec.util.process import python_executable
 
 _TIMEOUT_SECONDS = 15
+OPENCL_PROBE_HELPER_ARG = "--robo-rec-opencl-probe"
 
 # Run from btcrecover_root as cwd (matches how seedrecover.py itself is always
 # launched elsewhere in this codebase — see util/paths.py), so
 # `from btcrecover import btcrpass` resolves the same way it does for a real
 # recovery run (seedrecover.py itself does `from btcrecover import btcrseed`).
-_DETECTION_SCRIPT = """
-import json, sys
-try:
-    from btcrecover import btcrpass
-except Exception as exc:
-    print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
-    sys.exit(0)
-
-try:
-    devices = btcrpass.get_opencl_devices()
-except Exception as exc:
-    print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
-    sys.exit(0)
-
-result = []
-for i, d in enumerate(devices):
-    try:
-        platform_name = d.platform.name
-    except Exception:
-        platform_name = "unknown"
-    result.append({"platform": platform_name, "index": i, "name": d.name})
-print(json.dumps({"ok": True, "devices": result}))
-"""
+_DETECTION_SCRIPT = (
+    "from robo_rec.gpu.opencl_probe import run_opencl_probe_helper; "
+    "raise SystemExit(run_opencl_probe_helper())"
+)
 
 
 @dataclass(frozen=True)
@@ -79,7 +62,15 @@ class OpenClProbeResult:
 
 
 def probe_opencl() -> OpenClProbeResult:
-    argv = [python_executable(), "-c", _DETECTION_SCRIPT]
+    # A compiled Nuitka executable is not a general-purpose Python interpreter,
+    # so ``main.exe -c ...`` cannot run the helper script.  Re-enter the app in
+    # a dedicated helper mode instead.  Source runs continue to use the active
+    # virtual environment's interpreter.
+    argv = (
+        [sys.executable, OPENCL_PROBE_HELPER_ARG]
+        if is_compiled()
+        else [python_executable(), "-c", _DETECTION_SCRIPT]
+    )
     try:
         completed = subprocess.run(
             argv,
@@ -98,6 +89,38 @@ def probe_opencl() -> OpenClProbeResult:
         return OpenClProbeResult(available=False, devices=[], error=summary)
 
     return _parse_result(completed.stdout)
+
+
+def run_opencl_probe_helper() -> int:
+    """Entry point used by the compiled executable's OpenCL helper mode."""
+    try:
+        from numpy import __version__ as numpy_version
+        from pyopencl import VERSION_TEXT as pyopencl_version
+    except ImportError as exc:
+        print(json.dumps({"ok": False, "error": f"Missing OpenCL dependency: {exc}"}))
+        return 0
+
+    # Reference the imports so static packagers include both extension packages.
+    _ = (numpy_version, pyopencl_version)
+
+    try:
+        from btcrecover import btcrpass
+
+        devices = btcrpass.get_opencl_devices()
+    except Exception as exc:  # noqa: BLE001 - isolate arbitrary OpenCL driver failures
+        print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
+        return 0
+
+    result = []
+    for index, device in enumerate(devices):
+        try:
+            platform_name = device.platform.name
+        except Exception:  # noqa: BLE001 - optional driver metadata can fail independently
+            platform_name = "unknown"
+        result.append({"platform": platform_name, "index": index, "name": device.name})
+
+    print(json.dumps({"ok": True, "devices": result}))
+    return 0
 
 
 def _parse_result(stdout: str) -> OpenClProbeResult:
@@ -131,4 +154,10 @@ def _parse_result(stdout: str) -> OpenClProbeResult:
     return OpenClProbeResult(available=bool(devices), devices=devices, error=None)
 
 
-__all__ = ["OpenClDeviceInfo", "OpenClProbeResult", "probe_opencl"]
+__all__ = [
+    "OPENCL_PROBE_HELPER_ARG",
+    "OpenClDeviceInfo",
+    "OpenClProbeResult",
+    "probe_opencl",
+    "run_opencl_probe_helper",
+]

@@ -30,12 +30,14 @@ def build():
         "--hidden-import=robo_rec",
         "--collect-submodules=bip_utils",
         "--collect-submodules=coincurve",
+        "--collect-all=numpy",
+        "--collect-all=pyopencl",
         str(repo_root / "src" / "robo_rec" / "main.py"),
     ]
 
-    print(f"Building with PyInstaller...")
+    print("Building with PyInstaller...")
     print(f"Command: {' '.join(cmd)}\n")
-    result = subprocess.run(cmd, cwd=repo_root)
+    result = subprocess.run(cmd, cwd=repo_root, check=False)
 
     if result.returncode == 0:
         exe_path = dist / "dist" / "robo-rec.exe"

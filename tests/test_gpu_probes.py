@@ -2,26 +2,30 @@ import subprocess
 from unittest.mock import patch
 
 from robo_rec.gpu.cpu_probe import probe_cpu
-from robo_rec.gpu.nvidia_probe import probe_nvidia
-from robo_rec.gpu.opencl_probe import probe_opencl
+from robo_rec.gpu.nvidia_probe import NvidiaProbeResult, probe_nvidia
+from robo_rec.gpu.opencl_probe import OpenClProbeResult, probe_opencl
 from robo_rec.gpu.pycuda_probe import probe_pycuda_importable
 from robo_rec.gpu.report import probe_gpu_status
 
 
 def test_probe_gpu_status_degrades_gracefully_with_no_gpu():
-    """This is this dev machine's actual live state (no discrete GPU, pyopencl not
-    installed) — see robo-rec-implementation.md and PRD Section 6.1. Every probe must
-    fail without raising.
-
-    Only 2 probe_errors, not 3: the OpenCL probe now mirrors btcrpass.get_opencl_devices()'s
-    own distinction between "cleanly unavailable" (pyopencl missing / no platform found,
-    error=None) and "genuinely broken" (error set) — a plain "no GPU here" isn't an error
-    to surface, only NVIDIA (no nvidia-smi binary) and PyCUDA (not importable) are."""
-    report = probe_gpu_status()
+    """The no-GPU behavior must not depend on the machine running the tests."""
+    with (
+        patch(
+            "robo_rec.gpu.report.probe_opencl",
+            return_value=OpenClProbeResult(available=False, devices=[], error=None),
+        ),
+        patch(
+            "robo_rec.gpu.report.probe_nvidia",
+            return_value=NvidiaProbeResult(None, None, None, "nvidia-smi not found"),
+        ),
+        patch("robo_rec.gpu.report.probe_pycuda_importable", return_value=False),
+    ):
+        report = probe_gpu_status()
     assert report.opencl_available is False
     assert report.nvidia_driver_version is None
     assert report.pycuda_importable is False
-    assert len(report.probe_errors) == 2
+    assert report.probe_errors == ["NVIDIA: nvidia-smi not found"]
     assert report.gpu_acceleration_available is False
 
 
@@ -125,5 +129,5 @@ def test_probe_opencl_no_devices_found_is_unavailable_not_error():
 
 
 def test_probe_pycuda_importable_false_when_absent():
-    # pycuda isn't a project dependency and isn't installed in this environment.
-    assert probe_pycuda_importable() is False
+    with patch("robo_rec.gpu.pycuda_probe.importlib.util.find_spec", return_value=None):
+        assert probe_pycuda_importable() is False

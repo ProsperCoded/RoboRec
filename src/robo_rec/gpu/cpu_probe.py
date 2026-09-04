@@ -1,11 +1,4 @@
-"""Probes basic CPU info for display when no GPU acceleration is available (PRD 4.5's
-'falls back cleanly to CPU' — this gives the user something concrete to look at instead of
-just "no GPU"). Pure stdlib, no subprocess.
-
-platform.processor() is unreliable on Linux (returns '' — a known stdlib gap; it works on
-Windows, which is the shipping target per the PRD) so the model name is read from
-/proc/cpuinfo on Linux as a fallback, purely for local dev-machine testing/display.
-"""
+"""Probe basic CPU information using platform-native, dependency-free sources."""
 
 from __future__ import annotations
 
@@ -33,12 +26,28 @@ def probe_cpu() -> CpuInfo:
 
 
 def _model_name() -> str | None:
+    if platform.system() == "Windows":
+        name = _windows_model_name_from_registry()
+        if name:
+            return name
     name = platform.processor()
     if name:
         return name
     if platform.system() == "Linux":
         return _linux_model_name_from_proc()
     return None
+
+
+def _windows_model_name_from_registry() -> str | None:
+    try:
+        import winreg
+
+        key_path = r"HARDWARE\DESCRIPTION\System\CentralProcessor\0"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
+            value, _ = winreg.QueryValueEx(key, "ProcessorNameString")
+    except (ImportError, OSError):
+        return None
+    return str(value).strip() or None
 
 
 def _linux_model_name_from_proc() -> str | None:

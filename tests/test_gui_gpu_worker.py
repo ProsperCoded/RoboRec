@@ -12,9 +12,7 @@ def test_gpu_probe_worker_delivers_on_main_thread(qtbot):
 
     report = blocker.args[0]
     assert QThread.currentThread() is main_thread
-    # This dev machine has no discrete GPU (see robo-rec-implementation.md) — every probe
-    # degrades gracefully rather than raising, so the report should reflect that cleanly.
-    assert report.opencl_available is False
-    assert report.probe_errors
+    assert isinstance(report.opencl_available, bool)
+    assert report.cpu_info.logical_cores
 
     worker.wait_and_cleanup()

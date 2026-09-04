@@ -73,25 +73,25 @@ def test_gpu_status_panel_shows_real_probe_result(qtbot):
     panel = window._gpu_status_panel
 
     qtbot.waitUntil(lambda: panel._latest_report is not None, timeout=15000)
-    # This dev machine has no discrete GPU (robo-rec-implementation.md) — confirms the
-    # panel is reading the real probe_gpu_status() result, not a mock.
-    assert panel._latest_report.opencl_available is False
+    assert isinstance(panel._latest_report.opencl_available, bool)
+    assert bool(panel._latest_report.opencl_devices) == panel._latest_report.opencl_available
     assert panel._export_button.isEnabled()
     window.close()
 
 
-def test_gpu_status_panel_shows_real_cpu_details_when_no_gpu(qtbot):
+def test_gpu_status_panel_shows_details_for_detected_runtime(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
     panel = window._gpu_status_panel
 
     qtbot.waitUntil(lambda: panel._latest_report is not None, timeout=15000)
-    # No discrete GPU on this dev machine, so the CPU details section should be shown
-    # and populated with real platform data (robo-rec-implementation.md).
-    assert panel._latest_report.gpu_acceleration_available is False
-    assert panel._cpu_group.isVisibleTo(panel)
-    assert panel._cpu_cores_label.text()
-    assert panel._cpu_os_label.text()
+    if panel._latest_report.gpu_acceleration_available:
+        assert panel._opencl_label.text().startswith("OpenCL devices:")
+        assert panel._cpu_group.isHidden()
+    else:
+        assert not panel._cpu_group.isHidden()
+        assert panel._cpu_cores_label.text()
+        assert panel._cpu_os_label.text()
     window.close()
 
 

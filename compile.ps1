@@ -31,6 +31,8 @@ $nuitkaArgs = @(
     "--include-package=PySide6"
     "--include-package=Crypto"
     "--include-package=py_crypto_hd_wallet"
+    "--include-package=numpy"
+    "--include-package=pyopencl"
     "--include-data-dir=src/robo_rec/gui/assets=robo_rec/gui/assets"
     "--include-data-dir=vendor=vendor"
     "--windows-icon-from-ico=src/robo_rec/gui/assets/app-icon.ico"

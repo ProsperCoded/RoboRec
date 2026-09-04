@@ -21,6 +21,13 @@ def _set_windows_app_id() -> None:
 
 
 def main() -> int:
+    # Nuitka one-file builds re-enter this executable to isolate OpenCL driver
+    # enumeration from the GUI process.  Handle that mode before creating Qt.
+    from robo_rec.gpu.opencl_probe import OPENCL_PROBE_HELPER_ARG, run_opencl_probe_helper
+
+    if OPENCL_PROBE_HELPER_ARG in sys.argv[1:]:
+        return run_opencl_probe_helper()
+
     _set_windows_app_id()
     app = QApplication(sys.argv)
     app.setApplicationName("RoboRec")

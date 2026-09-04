@@ -1,13 +1,4 @@
-"""Composes the OpenCL, NVIDIA driver, PyCUDA, and CPU probes into one status report
-(PRD 4.5).
-
-Every GPU probe's failure is caught and appended to probe_errors rather than raised — this
-dev machine has no discrete GPU, so every code path here must degrade gracefully; that's also
-exactly what makes it fully testable right now (mocked subprocess output covers the "no GPU"
-branch, which is this machine's actual live state). CPU info is always populated (it's pure
-stdlib, no failure mode) so the GPU Status view has something concrete to show when no GPU is
-detected, rather than just an absence.
-"""
+"""Compose OpenCL, NVIDIA, optional PyCUDA, and CPU diagnostics into one report."""
 
 from __future__ import annotations
 
@@ -53,8 +44,8 @@ def probe_gpu_status(*, btcrecover_dir: Path | None = None) -> GpuStatusReport:
         errors.append(f"NVIDIA: {nvidia_result.error}")
 
     pycuda_ok = probe_pycuda_importable()
-    if not pycuda_ok:
-        errors.append("PyCUDA: module not importable")
+    # Recovery uses OpenCL, not PyCUDA.  Keep this informational field for
+    # diagnostics without presenting an unused optional package as a failure.
 
     return GpuStatusReport(
         opencl_available=opencl_result.available,

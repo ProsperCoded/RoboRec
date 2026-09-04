@@ -147,7 +147,9 @@ class GpuStatusPanel(BasePanel):
             self._opencl_label.setText("OpenCL: no devices available")
 
         self._pycuda_label.setText(
-            "PyCUDA: importable" if report.pycuda_importable else "PyCUDA: not available"
+            "PyCUDA: available (optional)"
+            if report.pycuda_importable
+            else "PyCUDA: not installed (optional; OpenCL is used for recovery)"
         )
 
         if report.probe_errors:

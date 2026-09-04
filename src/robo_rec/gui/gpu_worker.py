@@ -1,7 +1,7 @@
 """Qt bridge for robo_rec.gpu.probe_gpu_status().
 
-Each individual probe (opencl_probe, nvidia_probe, pycuda_probe) shells out to a subprocess
-or does a filesystem/import check with its own timeout, so a full probe_gpu_status() call is
+The OpenCL and NVIDIA probes shell out to subprocesses, while the optional PyCUDA check uses
+module discovery. A full probe_gpu_status() call is
 normally well under a second — but it can stall up to the sum of each probe's timeout in a
 degenerate case (e.g. a hung subprocess), so it's still run off the Qt main thread rather than
 assumed instant. Uses the same QThread pattern as recovery_worker.py: the worker QObject lives
