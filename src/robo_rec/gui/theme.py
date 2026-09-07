@@ -322,13 +322,84 @@ QComboBox QAbstractItemView {{
     outline: none;
 }}
 
-QRadioButton, QCheckBox {{
+QRadioButton {{
+    color: {TEXT_PRIMARY};
+    spacing: 10px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 8px 11px;
+}}
+
+QRadioButton:hover {{
+    color: {ACCENT};
+    background-color: {SURFACE_RAISED};
+    border-color: {BORDER_STRONG};
+}}
+
+QRadioButton:checked {{
+    color: {ACCENT};
+    background-color: {ACCENT_DIM};
+    border-color: {ACCENT};
+    font-weight: 600;
+}}
+
+QRadioButton:focus {{
+    border-color: {ACCENT};
+}}
+
+QRadioButton:disabled {{
+    color: {TEXT_MUTED};
+    background-color: transparent;
+    border-color: transparent;
+}}
+
+QRadioButton::indicator {{
+    width: 16px;
+    height: 16px;
+    border: 2px solid {BORDER_STRONG};
+    border-radius: 9px;
+    background-color: {BG};
+}}
+
+QRadioButton::indicator:hover {{
+    border-color: {ACCENT};
+}}
+
+QRadioButton::indicator:checked {{
+    background-color: {ACCENT};
+    border: 4px solid {SURFACE};
+}}
+
+QRadioButton::indicator:disabled {{
+    background-color: {SURFACE_RAISED};
+    border-color: {BORDER};
+}}
+
+QCheckBox {{
     color: {TEXT_PRIMARY};
     spacing: 8px;
 }}
 
-QRadioButton:hover, QCheckBox:hover {{
+QCheckBox:hover, QCheckBox:checked {{
     color: {ACCENT};
+}}
+
+QCheckBox::indicator {{
+    width: 16px;
+    height: 16px;
+    border: 2px solid {BORDER_STRONG};
+    border-radius: 4px;
+    background-color: {BG};
+}}
+
+QCheckBox::indicator:hover {{
+    border-color: {ACCENT};
+}}
+
+QCheckBox::indicator:checked {{
+    background-color: {ACCENT};
+    border-color: {ACCENT};
 }}
 
 /* ---- Buttons ---- */

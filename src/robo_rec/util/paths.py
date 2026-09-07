@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -10,12 +12,15 @@ class BtcrecoverNotFoundError(FileNotFoundError):
     """Raised when the vendored btcrecover checkout can't be located."""
 
 
-import os
-import sys
-
 def is_compiled() -> bool:
-    """Check if the code is running under a compiled Nuitka binary."""
-    return hasattr(sys, "frozen") or "__compiled__" in sys.builtin_module_names
+    """Check whether the code is running from a frozen/compiled executable.
+
+    PyInstaller exposes ``sys.frozen`` while Nuitka injects ``__compiled__``
+    into compiled module globals. ``__compiled__`` is not a builtin module
+    name, so checking ``sys.builtin_module_names`` misclassified Nuitka's
+    one-file extraction directory as a normal source checkout.
+    """
+    return bool(getattr(sys, "frozen", False) or globals().get("__compiled__"))
 
 
 @lru_cache(maxsize=1)

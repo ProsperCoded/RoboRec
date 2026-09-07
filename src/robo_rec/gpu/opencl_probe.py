@@ -1,6 +1,4 @@
-"""Probes OpenCL GPU availability by calling btcrecover's own detection function,
-btcrpass.get_opencl_devices(), instead of parsing seedrecover.py --opencl-info's
-human-readable text output.
+"""Probe OpenCL GPU availability in an isolated subprocess.
 
 Why not --opencl-info: btcrecover's own test suite (btcrecover/test/test_seeds.py's
 has_any_opencl_devices(), which gates every OpenCL_Tests case) uses
@@ -17,11 +15,11 @@ pyopencl isn't installed, so scraping its stdout means treating a real upstream 
 as just another "empty output" case, and parsing device names/IDs out of
 human-readable text whose exact format was never confirmed against real hardware.
 
-This probe instead runs a small script that imports btcrpass (the same module
-seedrecover.py itself already imports for every real run, so this carries no
-additional import risk) and calls get_opencl_devices() directly, printing the result
-as JSON. It's still run in a subprocess — not imported in-process — so a pyopencl
-driver crash during device enumeration can't take down the GUI process itself.
+The helper mirrors btcrpass.get_opencl_devices()'s filtering directly instead of
+importing the vendored module. This matters in compiled builds: pyopencl is an
+explicit build dependency, while the vendored btcrecover source tree is not an
+importable Python package inside the one-file executable. The probe remains in a
+subprocess so a driver crash during enumeration cannot take down the GUI process.
 """
 
 from __future__ import annotations
@@ -31,16 +29,12 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from robo_rec.util.paths import btcrecover_root, is_compiled
+from robo_rec.util.paths import is_compiled
 from robo_rec.util.process import python_executable
 
 _TIMEOUT_SECONDS = 15
 OPENCL_PROBE_HELPER_ARG = "--robo-rec-opencl-probe"
 
-# Run from btcrecover_root as cwd (matches how seedrecover.py itself is always
-# launched elsewhere in this codebase — see util/paths.py), so
-# `from btcrecover import btcrpass` resolves the same way it does for a real
-# recovery run (seedrecover.py itself does `from btcrecover import btcrseed`).
 _DETECTION_SCRIPT = (
     "from robo_rec.gpu.opencl_probe import run_opencl_probe_helper; "
     "raise SystemExit(run_opencl_probe_helper())"
@@ -74,7 +68,6 @@ def probe_opencl() -> OpenClProbeResult:
     try:
         completed = subprocess.run(
             argv,
-            cwd=str(btcrecover_root()),
             capture_output=True,
             text=True,
             timeout=_TIMEOUT_SECONDS,
@@ -94,19 +87,33 @@ def probe_opencl() -> OpenClProbeResult:
 def run_opencl_probe_helper() -> int:
     """Entry point used by the compiled executable's OpenCL helper mode."""
     try:
+        import pyopencl
         from numpy import __version__ as numpy_version
-        from pyopencl import VERSION_TEXT as pyopencl_version
     except ImportError as exc:
         print(json.dumps({"ok": False, "error": f"Missing OpenCL dependency: {exc}"}))
         return 0
 
     # Reference the imports so static packagers include both extension packages.
-    _ = (numpy_version, pyopencl_version)
+    _ = numpy_version
 
     try:
-        from btcrecover import btcrpass
-
-        devices = btcrpass.get_opencl_devices()
+        devices = []
+        for platform in pyopencl.get_platforms():
+            for device in platform.get_devices():
+                if (
+                    device.available == 1
+                    and device.profile == "FULL_PROFILE"
+                    and device.endian_little == 1
+                ):
+                    devices.append(device)
+    except pyopencl.LogicError as exc:
+        # Match btcrecover's clean no-platform fallback while preserving
+        # unexpected driver/API failures as diagnostics.
+        if "platform not found" in str(exc).lower():
+            devices = []
+        else:
+            print(json.dumps({"ok": False, "error": f"LogicError: {exc}"}))
+            return 0
     except Exception as exc:  # noqa: BLE001 - isolate arbitrary OpenCL driver failures
         print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
         return 0
