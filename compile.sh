@@ -14,7 +14,7 @@ rm -rf dist
 NUM_CORES=$(nproc 2>/dev/null || echo 4)
 
 .venv/bin/python -m nuitka \
-  --onefile \
+  --standalone \
   --follow-imports \
   --enable-plugin=pyside6 \
   --include-package=robo_rec \
@@ -29,24 +29,27 @@ NUM_CORES=$(nproc 2>/dev/null || echo 4)
   --include-data-dir="vendor=vendor" \
   --windows-icon-from-ico="src/robo_rec/gui/assets/app-icon.ico" \
   --windows-console-mode=disable \
+  --output-filename=Roborec \
   --jobs="$NUM_CORES" \
   --lto=auto \
   --output-dir=dist \
   src/robo_rec/main.py
 
-if [ -f "dist/main.exe" ]; then
-  EXECUTABLE="dist/main.exe"
-  SIZE=$(du -h dist/main.exe | cut -f1)
-elif [ -f "dist/main.bin" ]; then
-  EXECUTABLE="dist/main.bin"
-  SIZE=$(du -h dist/main.bin | cut -f1)
-else
-  echo "✗ Build failed - executable not found"
+EXECUTABLE=$(find dist -type f \( -name "Roborec.exe" -o -name "Roborec" \) | head -n 1)
+
+if [ -z "$EXECUTABLE" ]; then
+  echo "✗ Build failed - executable not found under dist/"
   exit 1
 fi
 
+FOLDER=$(dirname "$EXECUTABLE")
+SIZE=$(du -sh "$FOLDER" | cut -f1)
+
 echo ""
 echo "✓ Build successful!"
-echo "  Executable: $EXECUTABLE"
-echo "  Size: $SIZE"
+echo "  Folder to copy: $FOLDER"
+echo "  Executable:     $EXECUTABLE"
+echo "  Total size:     $SIZE"
+echo ""
+echo "Copy the WHOLE folder above to the flash drive, not just the executable."
 chmod +x "$EXECUTABLE"

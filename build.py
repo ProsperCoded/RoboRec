@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build robo-rec into a single Windows executable using Nuitka."""
+"""Build robo-rec into a standalone folder using Nuitka."""
 import shutil
 import subprocess
 import sys
@@ -19,7 +19,7 @@ def build():
         sys.executable,
         "-m",
         "nuitka",
-        "--onefile",
+        "--standalone",
         "--follow-imports",
         "--include-package=robo_rec",
         "--include-package=bip_utils",
@@ -30,6 +30,7 @@ def build():
         "--include-data-dir=src/robo_rec/gui/assets=robo_rec/gui/assets",
         "--windows-icon-from-ico=src/robo_rec/gui/assets/app-icon.ico",
         "--windows-console-mode=disable",
+        "--output-filename=Roborec.exe",
         "--output-dir=dist",
         str(repo_root / "src" / "robo_rec" / "main.py"),
     ]
@@ -39,10 +40,18 @@ def build():
     result = subprocess.run(cmd, cwd=repo_root, check=False)
 
     if result.returncode == 0:
-        exe_path = dist / "main.exe"
-        if exe_path.exists():
-            print(f"\n✓ Build successful: {exe_path}")
-            print(f"  File size: {exe_path.stat().st_size / (1024**2):.1f} MB")
+        matches = list(dist.rglob("Roborec.exe")) or list(dist.rglob("Roborec"))
+        if matches:
+            exe_path = matches[0]
+            folder = exe_path.parent
+            total_size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
+            print(f"\n✓ Build successful!")
+            print(f"  Folder to copy: {folder}")
+            print(f"  Executable:     {exe_path}")
+            print(f"  Total size:     {total_size / (1024**2):.1f} MB")
+            print("\nCopy the WHOLE folder above to the flash drive, not just the executable.")
+        else:
+            print("\n✗ Build completed but Roborec.exe not found under dist/")
 
     sys.exit(result.returncode)
 

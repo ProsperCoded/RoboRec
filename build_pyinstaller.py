@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build robo-rec using PyInstaller (alternative to Nuitka)."""
+"""Build robo-rec as a standalone folder using PyInstaller (alternative to Nuitka)."""
 import shutil
 import subprocess
 import sys
@@ -17,9 +17,9 @@ def build():
     # PyInstaller spec file approach
     cmd = [
         "pyinstaller",
-        "--onefile",
+        "--onedir",
         "--windowed",
-        "--name=robo-rec",
+        "--name=Roborec",
         f"--icon={repo_root / 'src' / 'robo_rec' / 'gui' / 'assets' / 'app-icon.ico'}",
         f"--add-data={repo_root / 'src' / 'robo_rec' / 'gui' / 'assets'}{';' if sys.platform == 'win32' else ':'}robo_rec/gui/assets",
         f"--distpath={dist / 'dist'}",
@@ -40,10 +40,17 @@ def build():
     result = subprocess.run(cmd, cwd=repo_root, check=False)
 
     if result.returncode == 0:
-        exe_path = dist / "dist" / "robo-rec.exe"
+        exe_path = dist / "dist" / "Roborec" / "Roborec.exe"
         if exe_path.exists():
-            print(f"\n✓ Build successful: {exe_path}")
-            print(f"  File size: {exe_path.stat().st_size / (1024**2):.1f} MB")
+            folder = exe_path.parent
+            total_size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
+            print(f"\n✓ Build successful!")
+            print(f"  Folder to copy: {folder}")
+            print(f"  Executable:     {exe_path}")
+            print(f"  Total size:     {total_size / (1024**2):.1f} MB")
+            print("\nCopy the WHOLE folder above to the flash drive, not just the executable.")
+        else:
+            print(f"\n✗ Build completed but {exe_path} not found")
 
     sys.exit(result.returncode)
 

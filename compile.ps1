@@ -1,4 +1,4 @@
-# Build RoboRec with Nuitka into a single Windows executable
+# Build RoboRec with Nuitka as a standalone folder (Roborec.dist\Roborec.exe)
 param(
     [switch]$Clean = $true
 )
@@ -22,7 +22,7 @@ Write-Host "Starting compilation on $numCores cores..." -ForegroundColor Cyan
 $nuitkaArgs = @(
     "-m"
     "nuitka"
-    "--onefile"
+    "--standalone"
     "--follow-imports"
     "--enable-plugin=pyside6"
     "--include-package=robo_rec"
@@ -37,6 +37,7 @@ $nuitkaArgs = @(
     "--include-data-dir=vendor=vendor"
     "--windows-icon-from-ico=src/robo_rec/gui/assets/app-icon.ico"
     "--windows-console-mode=disable"
+    "--output-filename=Roborec.exe"
     "--jobs=$numCores"
     "--lto=auto"
     "--output-dir=dist"
@@ -46,15 +47,19 @@ $nuitkaArgs = @(
 & .venv\Scripts\python.exe @nuitkaArgs
 
 if ($LASTEXITCODE -eq 0) {
-    if (Test-Path "dist\main.exe") {
-        $size = (Get-Item "dist\main.exe").Length / 1MB
+    $exe = Get-ChildItem -Path dist -Recurse -Filter "Roborec.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($exe) {
+        $folderSize = (Get-ChildItem -Path $exe.Directory.FullName -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
         Write-Host ""
         Write-Host "Build successful!" -ForegroundColor Green
-        Write-Host "  Executable: dist\main.exe" -ForegroundColor Green
-        Write-Host "  Size: $([math]::Round($size, 1)) MB" -ForegroundColor Green
+        Write-Host "  Folder to copy:  $($exe.Directory.FullName)" -ForegroundColor Green
+        Write-Host "  Executable:      $($exe.FullName)" -ForegroundColor Green
+        Write-Host "  Total size: $([math]::Round($folderSize, 1)) MB" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Copy the WHOLE folder above to the flash drive, not just the .exe." -ForegroundColor Yellow
         exit 0
     } else {
-        Write-Host "Build completed but main.exe not found" -ForegroundColor Red
+        Write-Host "Build completed but Roborec.exe not found under dist\" -ForegroundColor Red
         exit 1
     }
 } else {
