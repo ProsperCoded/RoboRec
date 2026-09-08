@@ -96,7 +96,15 @@ class GpuStatusPanel(BasePanel):
 
         self.root_layout.addStretch(1)
 
-        self._start_probe()
+        # No automatic probe here. MainWindow runs exactly one probe at startup and
+        # feeds the result into this panel via apply_report() once it's ready — this
+        # panel used to fire its own probe in __init__ *in addition to* MainWindow's
+        # startup probe for the top-bar badge, so every launch raced two concurrent
+        # GPU probes (each shelling out to a subprocess). Whichever one finished last
+        # silently won, which meant the badge and this panel could disagree, and a
+        # probe that lost the race under load could report "CPU only" even when the
+        # other one found the GPU fine. Only the explicit "Re-check GPU" button (and
+        # apply_report(), for MainWindow's shared result) update this panel now.
 
     def _start_probe(self) -> None:
         self._refresh_button.setEnabled(False)
@@ -115,12 +123,19 @@ class GpuStatusPanel(BasePanel):
             self._worker = None
 
     def _on_report_finished(self, report: GpuStatusReport) -> None:
-        self._latest_report = report
         self._refresh_button.setEnabled(True)
-        self._export_button.setEnabled(True)
         if self._worker is not None:
             self._worker.wait_and_cleanup()
             self._worker = None
+        self.apply_report(report)
+
+    def apply_report(self, report: GpuStatusReport) -> None:
+        """Update the panel's display from a GpuStatusReport obtained elsewhere — either
+        this panel's own Re-check probe, or MainWindow's single shared startup probe.
+        Kept separate from _on_report_finished so MainWindow can push its result here
+        without this panel spawning a second, redundant probe of its own."""
+        self._latest_report = report
+        self._export_button.setEnabled(True)
 
         if report.gpu_acceleration_available:
             self._summary_icon.setPixmap(load_pixmap("cpu", ACCENT, 20))

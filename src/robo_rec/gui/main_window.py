@@ -187,6 +187,10 @@ class MainWindow(QMainWindow):
 
     def _on_startup_gpu_probe_finished(self, report) -> None:
         self.set_gpu_status(report.gpu_acceleration_available)
+        # Feed the same probe result to the GPU Status panel instead of letting it run
+        # its own — see gpu_status.py's comment on why a second concurrent probe there
+        # was the likely cause of "detected once, CPU-only the next run" inconsistency.
+        self._gpu_status_panel.apply_report(report)
         if self._startup_gpu_worker is not None:
             self._startup_gpu_worker.wait_and_cleanup()
             self._startup_gpu_worker = None

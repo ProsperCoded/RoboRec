@@ -32,7 +32,11 @@ from dataclasses import dataclass
 from robo_rec.util.paths import is_compiled
 from robo_rec.util.process import python_executable
 
-_TIMEOUT_SECONDS = 15
+# Generous margin: this relaunches the whole executable as a subprocess just to run
+# the probe helper, and on removable media an antivirus on-execute scan of that
+# relaunch can itself take several seconds. A timeout that's too tight here reads
+# as "GPU not available" even when the hardware and drivers are fine.
+_TIMEOUT_SECONDS = 30
 OPENCL_PROBE_HELPER_ARG = "--robo-rec-opencl-probe"
 
 _DETECTION_SCRIPT = (
@@ -131,10 +135,22 @@ def run_opencl_probe_helper() -> int:
 
 
 def _parse_result(stdout: str) -> OpenClProbeResult:
-    try:
-        payload = json.loads(stdout.strip().splitlines()[-1]) if stdout.strip() else None
-    except (json.JSONDecodeError, IndexError):
-        payload = None
+    # Scan from the end for a line that parses as our JSON payload shape, rather than
+    # assuming the very last line always is one. Some OpenCL ICD drivers print stray
+    # warnings to stdout (not stderr) around enumeration, which would otherwise land
+    # after our JSON line and make a perfectly good result look like "no output."
+    payload = None
+    for line in reversed(stdout.strip().splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            candidate = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(candidate, dict) and "ok" in candidate:
+            payload = candidate
+            break
 
     if not payload:
         return OpenClProbeResult(available=False, devices=[], error="No output from OpenCL probe script")
