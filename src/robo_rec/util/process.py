@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import threading
@@ -26,6 +27,14 @@ def stream_lines(
     # piped, unless the new process is explicitly told not to allocate one.
     creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
+    # Python block-buffers stdout (~8KB) whenever it isn't a tty, and a pipe isn't one.
+    # bufsize=1 below only makes *this* process read line-by-line — it has no effect on how
+    # the child writes. Without this the child holds every phase/ETA line until it exits or
+    # fills the buffer, so a search that runs for hours delivers its entire log in one burst
+    # at the end and the GUI's progress panel sits blank throughout (verified: a 13-second
+    # run emitted all 30 lines simultaneously on exit).
+    env = os.environ | {"PYTHONUNBUFFERED": "1"}
+
     process = subprocess.Popen(
         argv,
         cwd=str(cwd),
@@ -34,6 +43,7 @@ def stream_lines(
         text=True,
         bufsize=1,
         creationflags=creationflags,
+        env=env,
     )
 
     def _lines() -> Iterator[str]:

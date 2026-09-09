@@ -49,6 +49,31 @@ def test_missing_word_known_position_sets_typos_and_big_typos_to_missing_count()
     assert argv[argv.index("--big-typos") + 1] == "2"
 
 
+def test_missing_word_known_position_budgets_unmatchable_known_word_too():
+    """A known word that maps to no wordlist entry costs a big typo of its own inside
+    btcrseed.py. Budgeting only for the blanks would make that phase abort instantly
+    ("Not enough entirely different seed words permitted") on a single mistyped word."""
+    words = WORDS_12.copy()
+    words[4] = None
+    words[6] = "zzzzzzzz"  # no close match anywhere in the wordlist
+    spec = MissingWordKnownPositionSpec(words=words, wallet_type="bip39", addrs=[ADDR])
+    argv = build_missing_word_known_position_args(spec)
+    assert argv[argv.index("--big-typos") + 1] == "2"  # 1 blank + 1 unmatchable word
+    assert argv[argv.index("--typos") + 1] == "2"
+
+
+def test_missing_word_known_position_counts_close_spelling_as_regular_typo_only():
+    """A misspelling that difflib still maps to a real word is corrected via a regular
+    typo, not a full 2048-word search, so it must not inflate the --big-typos budget."""
+    words = WORDS_12.copy()
+    words[4] = None
+    words[6] = "regionn"  # close match: "region"
+    spec = MissingWordKnownPositionSpec(words=words, wallet_type="bip39", addrs=[ADDR])
+    argv = build_missing_word_known_position_args(spec)
+    assert argv[argv.index("--big-typos") + 1] == "1"  # the blank only
+    assert argv[argv.index("--typos") + 1] == "2"  # blank + close-spelling correction
+
+
 def test_missing_word_known_position_omits_gpu_flag_by_default():
     words = WORDS_12.copy()
     words[4] = None

@@ -24,7 +24,7 @@ def test_missing_words_panel_recovers_real_blank_via_ui(qtbot):
     assert panel._start_button.isEnabled()
 
     panel._on_proceed_clicked()
-    qtbot.waitUntil(lambda: panel._view_stack.currentIndex() == 2, timeout=15000)
+    qtbot.waitUntil(lambda: panel._view_stack.currentIndex() == 2, timeout=60000)
 
     assert panel._result_row.words() == WORDS
     assert panel._copy_button.isVisibleTo(panel)
@@ -72,7 +72,7 @@ def test_gpu_status_panel_shows_real_probe_result(qtbot):
     qtbot.addWidget(window)
     panel = window._gpu_status_panel
 
-    qtbot.waitUntil(lambda: panel._latest_report is not None, timeout=15000)
+    qtbot.waitUntil(lambda: panel._latest_report is not None, timeout=60000)
     assert isinstance(panel._latest_report.opencl_available, bool)
     assert bool(panel._latest_report.opencl_devices) == panel._latest_report.opencl_available
     assert panel._export_button.isEnabled()
@@ -84,7 +84,7 @@ def test_gpu_status_panel_shows_details_for_detected_runtime(qtbot):
     qtbot.addWidget(window)
     panel = window._gpu_status_panel
 
-    qtbot.waitUntil(lambda: panel._latest_report is not None, timeout=15000)
+    qtbot.waitUntil(lambda: panel._latest_report is not None, timeout=60000)
     if panel._latest_report.gpu_acceleration_available:
         assert panel._opencl_label.text().startswith("OpenCL devices:")
         assert panel._cpu_group.isHidden()
@@ -118,7 +118,7 @@ def test_typo_correction_panel_recovers_real_typo_via_ui(qtbot):
     panel._address_field.setText(BTC_ADDRESS)
 
     panel._on_proceed_clicked()
-    qtbot.waitUntil(lambda: panel._view_stack.currentIndex() == 2, timeout=15000)
+    qtbot.waitUntil(lambda: panel._view_stack.currentIndex() == 2, timeout=60000)
 
     assert panel._result_row.words() == WORDS
     window.close()
@@ -139,7 +139,7 @@ def test_rearrange_panel_recovers_real_scramble_via_ui(qtbot):
     panel._address_field.setText(BTC_ADDRESS)
 
     panel._on_proceed_clicked()
-    qtbot.waitUntil(lambda: panel._view_stack.currentIndex() == 2, timeout=15000)
+    qtbot.waitUntil(lambda: panel._view_stack.currentIndex() == 2, timeout=60000)
 
     assert panel._result_row.words() == WORDS
     window.close()

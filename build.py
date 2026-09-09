@@ -102,6 +102,10 @@ def _build_seedrecover(repo_root: Path) -> int:
         "--follow-imports",
         "--include-package=btcrecover",
         "--include-package=lib",
+        # lib/'s data files aren't bundled by --include-package alone, and lib/bitcoinlib
+        # reads config/VERSION at import time, so seedrecover.exe died instantly without
+        # them. Also covers lib/opencl_brute's kernels, needed for --enable-opencl.
+        "--include-package-data=lib",
         "--include-package=bip_utils",
         "--include-package=coincurve",
         "--include-package=Crypto",

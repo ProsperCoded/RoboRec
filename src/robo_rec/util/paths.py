@@ -23,6 +23,48 @@ def is_compiled() -> bool:
     return bool(getattr(sys, "frozen", False) or globals().get("__compiled__"))
 
 
+def app_executable() -> str:
+    """Absolute path to the program currently running.
+
+    ``sys.executable`` is the obvious choice, and it is wrong in exactly the case
+    that matters: Nuitka's ``--standalone`` mode makes the dist folder look like a
+    Python installation (``sys.prefix`` points at it) and reports
+    ``<dist>/python.exe`` as the executable — a file standalone builds never ship.
+    Handing that path to ``subprocess`` fails with "[WinError 2] The system cannot
+    find the file specified", which is why re-launching the app to run the OpenCL
+    probe helper worked from source (where ``sys.executable`` really is the
+    interpreter) but silently reported "no GPU" in every compiled build.
+    """
+    if not is_compiled():
+        return sys.executable
+
+    candidates: list[str] = []
+
+    if sys.platform == "win32":
+        # Authoritative: reports the running image's real path no matter how the
+        # process was started, where argv[0] can be a bare name (launched via
+        # PATH) or resolve against a working directory the app has since changed.
+        import ctypes
+
+        buffer = ctypes.create_unicode_buffer(32768)
+        if ctypes.windll.kernel32.GetModuleFileNameW(None, buffer, len(buffer)):
+            candidates.append(buffer.value)
+
+    # Nuitka stashes the launch path here before anything can mutate sys.argv.
+    original_argv0 = getattr(globals().get("__compiled__"), "original_argv0", None)
+    if original_argv0:
+        candidates.append(original_argv0)
+    if sys.argv and sys.argv[0]:
+        candidates.append(sys.argv[0])
+
+    for candidate in candidates:
+        resolved = Path(candidate).resolve()
+        if resolved.is_file():
+            return str(resolved)
+
+    return sys.executable
+
+
 @lru_cache(maxsize=1)
 def repo_root() -> Path:
     """Resolve the project root by walking up from this file until pyproject.toml is found.
@@ -41,8 +83,10 @@ def repo_root() -> Path:
             # Fallback: return parent of robo_rec package
             if candidate.name == "robo_rec" and (candidate.parent / "vendor").is_dir():
                 return candidate.parent
-        # If all else fails, return the executable directory
-        return Path(sys.executable).parent
+        # If all else fails, return the executable directory. Note app_executable()
+        # rather than sys.executable: under --standalone the latter names a
+        # python.exe that isn't there (see app_executable's docstring).
+        return Path(app_executable()).parent
 
     here = Path(__file__).resolve()
     for candidate in (here, *here.parents):
@@ -78,5 +122,8 @@ def seedrecover_command() -> list[str]:
     if is_compiled():
         binary_name = "seedrecover.exe" if os.name == "nt" else "seedrecover"
         return [str(repo_root() / binary_name)]
-    return [sys.executable, str(seedrecover_script())]
+    # -u so phase/ETA lines reach the GUI as they're printed rather than in one burst when
+    # the process exits (see util.process.stream_lines); the compiled build relies on the
+    # PYTHONUNBUFFERED it sets, since there's no interpreter flag to pass there.
+    return [sys.executable, "-u", str(seedrecover_script())]
 

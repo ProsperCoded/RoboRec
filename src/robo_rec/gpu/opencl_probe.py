@@ -29,7 +29,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from robo_rec.util.paths import is_compiled
+from robo_rec.util.paths import app_executable, is_compiled
 from robo_rec.util.process import python_executable
 
 # Generous margin: this relaunches the whole executable as a subprocess just to run
@@ -64,8 +64,13 @@ def probe_opencl() -> OpenClProbeResult:
     # so ``main.exe -c ...`` cannot run the helper script.  Re-enter the app in
     # a dedicated helper mode instead.  Source runs continue to use the active
     # virtual environment's interpreter.
+    #
+    # app_executable(), not sys.executable: a --standalone build reports
+    # ``<dist>/python.exe``, which it never ships, so this relaunch failed with
+    # "[WinError 2] The system cannot find the file specified" in every compiled
+    # build — surfacing in the GUI as a plain "no GPU acceleration".
     argv = (
-        [sys.executable, OPENCL_PROBE_HELPER_ARG]
+        [app_executable(), OPENCL_PROBE_HELPER_ARG]
         if is_compiled()
         else [python_executable(), "-c", _DETECTION_SCRIPT]
     )

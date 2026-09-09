@@ -65,6 +65,9 @@ SEEDRECOVER_BUILD_DIR="$REPO_ROOT/dist/_seedrecover_build"
     --follow-imports \
     --include-package=btcrecover \
     --include-package=lib \
+    `# lib/'s data files are not bundled by --include-package alone, and lib/bitcoinlib` \
+    `# reads config/VERSION at import time, so seedrecover.exe died instantly without them.` \
+    --include-package-data=lib \
     --include-package=bip_utils \
     --include-package=coincurve \
     --include-package=Crypto \

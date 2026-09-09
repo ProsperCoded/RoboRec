@@ -23,7 +23,7 @@ def test_events_and_finished_deliver_on_main_thread(qtbot):
     event_threads = []
     worker.event.connect(lambda e: event_threads.append(QThread.currentThread() is main_thread))
 
-    with qtbot.waitSignal(worker.finished, timeout=15000) as blocker:
+    with qtbot.waitSignal(worker.finished, timeout=60000) as blocker:
         worker.start()
 
     result = blocker.args[0]

@@ -35,6 +35,7 @@ from robo_rec.recovery.models import (
     TypoCorrectionSpec,
 )
 from robo_rec.recovery.tokenlist import build_tokenlist_file
+from robo_rec.util.mnemonic import close_words, is_valid_word
 
 # btcrecover defaults --threads to the full logical core count, which pegs every core at
 # 100% for the run's whole duration (hours, per PRD 4.1/4.2) and can starve the OS/GUI badly
@@ -47,6 +48,32 @@ _COMMON_FLAGS = ["--no-gui", "--dsw", "--threads", str(_WORKER_THREADS)]
 
 def _gpu_flags(use_gpu: bool) -> list[str]:
     return ["--enable-opencl"] if use_gpu else []
+
+
+def _typo_flags(num_blanks: int, known_words: list[str]) -> list[str]:
+    """--typos/--big-typos sized to what btcrseed.py's run_btcrecover() actually requires.
+
+    It models two separate budgets, and a phase is skipped outright (printing "Not enough
+    entirely different seed words permitted" and reporting "Seed not found") if either goes
+    negative:
+
+      * big_typos — spent on each blank/insert and on each word it can't map to any wordlist
+        entry, i.e. anything needing a full 2048-word search. Defaults to 0 and is NOT raised
+        by passing --typos alone, so omitting --big-typos makes any blank overrun it.
+      * typos — the total budget, which also covers close-spelling corrections.
+
+    Left unspecified, seedrecover falls back to an auto ladder of phases capping at
+    big_typos=2, so 3-4 known-position blanks (which PRD 4.2 supports) could never succeed.
+    Known words are inspected here because a word that matches nothing in the wordlist costs
+    a big typo of its own — budgeting only for the blanks would make one mistyped word abort
+    the whole search instantly.
+    """
+    unmatchable = sum(
+        1 for word in known_words if not is_valid_word(word) and not close_words(word)
+    )
+    close_only = sum(1 for word in known_words if not is_valid_word(word) and close_words(word))
+    big_typos = num_blanks + unmatchable
+    return ["--typos", str(big_typos + close_only), "--big-typos", str(big_typos)]
 
 
 def _target_flags(addrs: list[str] | None, mpk: str | None, addr_limit: int) -> list[str]:
@@ -104,19 +131,7 @@ def build_missing_word_known_position_args(
         mnemonic,
         "--mnemonic-length",
         str(len(spec.words)),
-        # btcrseed.py's run_btcrecover() treats each unmatched ("%%") word as a
-        # "big typo" (an entirely-different-word replacement) that must be covered by
-        # BOTH --typos (total mistake budget) and --big-typos (budget specifically for
-        # whole-word replacements) — big_typos defaults to 0 and isn't raised just because
-        # --typos was passed, so omitting --big-typos here makes it go negative for any
-        # missing word and the whole phase gets skipped with "Not enough entirely
-        # different seed words permitted", reporting "Seed not found" even when the
-        # correct phrase is in range. Confirmed by direct testing against a known-good
-        # mnemonic/address pair.
-        "--typos",
-        str(num_missing),
-        "--big-typos",
-        str(num_missing),
+        *_typo_flags(num_missing, [word for word in spec.words if word is not None]),
         *_target_flags(spec.addrs, spec.mpk, spec.addr_limit),
     ]
 
@@ -138,14 +153,8 @@ def build_missing_word_unknown_position_args(
         mnemonic,
         "--mnemonic-length",
         str(spec.full_length),
-        # See build_missing_word_known_position_args's comment: --big-typos must also be
-        # passed (not just --typos), or big_typos defaults to 0 and any missing word makes
-        # btcrseed.py skip the whole phase as "Not enough entirely different seed words
-        # permitted", reporting "Seed not found" even for a genuinely correct phrase.
-        "--typos",
-        str(num_missing),
-        "--big-typos",
-        str(num_missing),
+        # Each omitted word is an insert, which draws on the same two budgets a blank does.
+        *_typo_flags(num_missing, list(spec.words)),
         *_target_flags(spec.addrs, spec.mpk, spec.addr_limit),
     ]
 

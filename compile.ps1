@@ -81,6 +81,13 @@ try {
         "--follow-imports"
         "--include-package=btcrecover"
         "--include-package=lib"
+        # --include-package alone bundles lib/'s modules but none of its data files, and
+        # lib/bitcoinlib reads them at import time (config.py's
+        # BITCOINLIB_VERSION = Path(BCL_INSTALL_DIR, 'config/VERSION').open()), so every
+        # compiled seedrecover.exe died instantly with "FileNotFoundError: ...
+        # lib\bitcoinlib\config\VERSION" before searching a single candidate. Also covers
+        # lib/opencl_brute's kernels, needed for --enable-opencl. ~2MB total.
+        "--include-package-data=lib"
         "--include-package=bip_utils"
         "--include-package=coincurve"
         "--include-package=Crypto"
