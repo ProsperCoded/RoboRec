@@ -21,6 +21,11 @@ def stream_lines(
     interleaves informational prints on both streams). The iterator stops when the process
     exits or stop_event is set (caller is responsible for then terminating the process).
     """
+    # On Windows, a console-subsystem child (seedrecover.exe, or the dev-mode
+    # python.exe) can still briefly flash a console window even with stdout/stderr
+    # piped, unless the new process is explicitly told not to allocate one.
+    creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
     process = subprocess.Popen(
         argv,
         cwd=str(cwd),
@@ -28,6 +33,7 @@ def stream_lines(
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        creationflags=creationflags,
     )
 
     def _lines() -> Iterator[str]:

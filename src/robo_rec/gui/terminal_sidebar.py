@@ -94,7 +94,7 @@ def _emit_synthetic_hash() -> str:
 
 
 def _emit_synthetic_compare() -> str:
-    return f"comparing against target address {_random_address()[:14]}…"
+    return f"comparing against target address {_random_address()}"
 
 
 def _emit_synthetic_rate() -> str:

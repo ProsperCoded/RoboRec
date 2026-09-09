@@ -39,21 +39,81 @@ def build():
     print("This may take 10-20 minutes on first build...\n")
     result = subprocess.run(cmd, cwd=repo_root, check=False)
 
-    if result.returncode == 0:
-        matches = list(dist.rglob("Roborec.exe")) or list(dist.rglob("Roborec"))
-        if matches:
-            exe_path = matches[0]
-            folder = exe_path.parent
-            total_size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
-            print(f"\n✓ Build successful!")
-            print(f"  Folder to copy: {folder}")
-            print(f"  Executable:     {exe_path}")
-            print(f"  Total size:     {total_size / (1024**2):.1f} MB")
-            print("\nCopy the WHOLE folder above to the flash drive, not just the executable.")
-        else:
-            print("\n✗ Build completed but Roborec.exe not found under dist/")
+    if result.returncode != 0:
+        sys.exit(result.returncode)
 
-    sys.exit(result.returncode)
+    matches = list(dist.rglob("Roborec.exe")) or list(dist.rglob("Roborec"))
+    if not matches:
+        print("\n✗ Build completed but Roborec.exe not found under dist/")
+        sys.exit(1)
+
+    app_folder = matches[0].parent
+    seedrecover_exit = _build_seedrecover(repo_root)
+    if seedrecover_exit != 0:
+        print(f"\n✗ seedrecover.exe build failed with exit code {seedrecover_exit}")
+        print("Roborec.exe built fine, but recovery will fail with WinError 2 until this is fixed.")
+        sys.exit(seedrecover_exit)
+
+    seedrecover_dist = repo_root / "dist" / "_seedrecover_build"
+    seedrecover_matches = list(seedrecover_dist.rglob("seedrecover.exe"))
+    if not seedrecover_matches:
+        print(f"\n✗ seedrecover build completed but seedrecover.exe not found under {seedrecover_dist}")
+        sys.exit(1)
+
+    print("Merging seedrecover.exe and its dependencies into the app folder...")
+    shutil.copytree(seedrecover_matches[0].parent, app_folder, dirs_exist_ok=True)
+
+    merged_seedrecover = app_folder / "seedrecover.exe"
+    if not merged_seedrecover.exists():
+        print(f"\n✗ Merge completed but seedrecover.exe is missing from {app_folder}")
+        sys.exit(1)
+
+    total_size = sum(f.stat().st_size for f in app_folder.rglob("*") if f.is_file())
+    print(f"\n✓ Build successful!")
+    print(f"  Folder to copy:  {app_folder}")
+    print(f"  Main executable: {matches[0]}")
+    print(f"  Recovery engine: {merged_seedrecover}")
+    print(f"  Total size:      {total_size / (1024**2):.1f} MB")
+    print("\nCopy the WHOLE folder above to the flash drive, not just the executable.")
+    sys.exit(0)
+
+
+def _build_seedrecover(repo_root: Path) -> int:
+    """Stage 2: compile vendor/btcrecover/seedrecover.py into its own executable.
+
+    Roborec.exe never runs recovery itself — it shells out to seedrecover.exe (see
+    robo_rec.util.paths.seedrecover_command()) and streams its output. Nothing built that
+    executable before, which is exactly the "[WinError 2] The system cannot find the file
+    specified" failure when clicking Proceed: repo_root()/seedrecover.exe was expected but
+    never produced.
+    """
+    print("\nBuilding seedrecover.exe (recovery engine) with Nuitka...")
+    btcrecover_dir = repo_root / "vendor" / "btcrecover"
+    output_dir = repo_root / "dist" / "_seedrecover_build"
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "nuitka",
+        "--standalone",
+        "--follow-imports",
+        "--include-package=btcrecover",
+        "--include-package=lib",
+        "--include-package=bip_utils",
+        "--include-package=coincurve",
+        "--include-package=Crypto",
+        "--include-package=py_crypto_hd_wallet",
+        "--include-package=numpy",
+        "--include-package=pyopencl",
+        "--include-package=google.protobuf",
+        "--include-data-dir=btcrecover/wordlists=btcrecover/wordlists",
+        "--include-data-dir=btcrecover/opencl=btcrecover/opencl",
+        "--output-filename=seedrecover.exe",
+        f"--output-dir={output_dir}",
+        "seedrecover.py",
+    ]
+    result = subprocess.run(cmd, cwd=btcrecover_dir, check=False)
+    return result.returncode
 
 
 if __name__ == "__main__":
