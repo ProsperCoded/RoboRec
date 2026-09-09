@@ -14,6 +14,7 @@ rm -rf dist
 NUM_CORES=$(nproc 2>/dev/null || echo 4)
 
 .venv/bin/python -m nuitka \
+  --assume-yes-for-downloads \
   --standalone \
   --follow-imports \
   --enable-plugin=pyside6 \
@@ -25,6 +26,7 @@ NUM_CORES=$(nproc 2>/dev/null || echo 4)
   --include-package=py_crypto_hd_wallet \
   --include-package=numpy \
   --include-package=pyopencl \
+  --include-package-data=pyopencl \
   --include-data-dir="src/robo_rec/gui/assets=robo_rec/gui/assets" \
   --include-data-dir="vendor=vendor" \
   --windows-icon-from-ico="src/robo_rec/gui/assets/app-icon.ico" \
@@ -58,6 +60,7 @@ SEEDRECOVER_BUILD_DIR="$REPO_ROOT/dist/_seedrecover_build"
 (
   cd "$REPO_ROOT/vendor/btcrecover"
   "$REPO_ROOT/.venv/bin/python" -m nuitka \
+    --assume-yes-for-downloads \
     --standalone \
     --follow-imports \
     --include-package=btcrecover \
@@ -68,6 +71,7 @@ SEEDRECOVER_BUILD_DIR="$REPO_ROOT/dist/_seedrecover_build"
     --include-package=py_crypto_hd_wallet \
     --include-package=numpy \
     --include-package=pyopencl \
+    --include-package-data=pyopencl \
     --include-package=google.protobuf \
     --include-data-dir="btcrecover/wordlists=btcrecover/wordlists" \
     --include-data-dir="btcrecover/opencl=btcrecover/opencl" \

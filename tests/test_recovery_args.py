@@ -35,6 +35,20 @@ def test_missing_word_known_position_uses_placeholder():
     assert argv[argv.index("--addrs") + 1] == ADDR
 
 
+def test_missing_word_known_position_sets_typos_and_big_typos_to_missing_count():
+    """Without both flags, btcrseed.py's big_typos budget defaults to 0 and goes negative
+    for any missing word, so the search phase is skipped with "Not enough entirely
+    different seed words permitted" — reporting "Seed not found" even for a correct
+    phrase. Confirmed by direct testing against a known-good mnemonic/address pair."""
+    words = WORDS_12.copy()
+    words[4] = None
+    words[7] = None
+    spec = MissingWordKnownPositionSpec(words=words, wallet_type="bip39", addrs=[ADDR])
+    argv = build_missing_word_known_position_args(spec)
+    assert argv[argv.index("--typos") + 1] == "2"
+    assert argv[argv.index("--big-typos") + 1] == "2"
+
+
 def test_missing_word_known_position_omits_gpu_flag_by_default():
     words = WORDS_12.copy()
     words[4] = None
@@ -89,6 +103,8 @@ def test_missing_word_unknown_position_omits_word_and_sets_length():
     assert mnemonic == "rotate dream drip opinion dove region mind visit diesel negative speed"
     assert "%%" not in mnemonic
     assert argv[argv.index("--mnemonic-length") + 1] == "12"
+    assert argv[argv.index("--typos") + 1] == "1"
+    assert argv[argv.index("--big-typos") + 1] == "1"
 
 
 def test_missing_word_unknown_position_passes_enable_opencl_when_gpu_requested():

@@ -96,6 +96,13 @@ def run_opencl_probe_helper() -> int:
     except ImportError as exc:
         print(json.dumps({"ok": False, "error": f"Missing OpenCL dependency: {exc}"}))
         return 0
+    except OSError as exc:
+        # pyopencl's own __init__.py raises OSError (not ImportError) if it can't
+        # locate its bundled "cl/" include directory next to itself — a packaging
+        # gap (missing data files), not a missing-dependency one, but just as fatal
+        # to importing the module.
+        print(json.dumps({"ok": False, "error": f"pyopencl failed to load: {exc}"}))
+        return 0
 
     # Reference the imports so static packagers include both extension packages.
     _ = numpy_version

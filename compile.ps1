@@ -22,6 +22,7 @@ Write-Host "Starting compilation on $numCores cores..." -ForegroundColor Cyan
 $nuitkaArgs = @(
     "-m"
     "nuitka"
+    "--assume-yes-for-downloads"
     "--standalone"
     "--follow-imports"
     "--enable-plugin=pyside6"
@@ -33,6 +34,7 @@ $nuitkaArgs = @(
     "--include-package=py_crypto_hd_wallet"
     "--include-package=numpy"
     "--include-package=pyopencl"
+    "--include-package-data=pyopencl"
     "--include-data-dir=src/robo_rec/gui/assets=robo_rec/gui/assets"
     "--include-data-dir=vendor=vendor"
     "--windows-icon-from-ico=src/robo_rec/gui/assets/app-icon.ico"
@@ -74,6 +76,7 @@ try {
     $seedrecoverArgs = @(
         "-m"
         "nuitka"
+        "--assume-yes-for-downloads"
         "--standalone"
         "--follow-imports"
         "--include-package=btcrecover"
@@ -84,6 +87,7 @@ try {
         "--include-package=py_crypto_hd_wallet"
         "--include-package=numpy"
         "--include-package=pyopencl"
+        "--include-package-data=pyopencl"
         "--include-package=google.protobuf"
         "--include-data-dir=btcrecover/wordlists=btcrecover/wordlists"
         "--include-data-dir=btcrecover/opencl=btcrecover/opencl"

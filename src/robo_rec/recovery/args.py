@@ -94,6 +94,7 @@ def build_missing_word_known_position_args(
     spec: MissingWordKnownPositionSpec, *, use_gpu: bool = False
 ) -> list[str]:
     mnemonic = " ".join(word if word is not None else "%%" for word in spec.words)
+    num_missing = sum(1 for word in spec.words if word is None)
     return [
         *_COMMON_FLAGS,
         *_gpu_flags(use_gpu),
@@ -103,6 +104,19 @@ def build_missing_word_known_position_args(
         mnemonic,
         "--mnemonic-length",
         str(len(spec.words)),
+        # btcrseed.py's run_btcrecover() treats each unmatched ("%%") word as a
+        # "big typo" (an entirely-different-word replacement) that must be covered by
+        # BOTH --typos (total mistake budget) and --big-typos (budget specifically for
+        # whole-word replacements) — big_typos defaults to 0 and isn't raised just because
+        # --typos was passed, so omitting --big-typos here makes it go negative for any
+        # missing word and the whole phase gets skipped with "Not enough entirely
+        # different seed words permitted", reporting "Seed not found" even when the
+        # correct phrase is in range. Confirmed by direct testing against a known-good
+        # mnemonic/address pair.
+        "--typos",
+        str(num_missing),
+        "--big-typos",
+        str(num_missing),
         *_target_flags(spec.addrs, spec.mpk, spec.addr_limit),
     ]
 
@@ -114,6 +128,7 @@ def build_missing_word_unknown_position_args(
     '%%') — this is what makes btcrecover search over position as well as word (see
     robo-rec-implementation.md Section 6.2)."""
     mnemonic = " ".join(spec.words)
+    num_missing = spec.full_length - len(spec.words)
     return [
         *_COMMON_FLAGS,
         *_gpu_flags(use_gpu),
@@ -123,6 +138,14 @@ def build_missing_word_unknown_position_args(
         mnemonic,
         "--mnemonic-length",
         str(spec.full_length),
+        # See build_missing_word_known_position_args's comment: --big-typos must also be
+        # passed (not just --typos), or big_typos defaults to 0 and any missing word makes
+        # btcrseed.py skip the whole phase as "Not enough entirely different seed words
+        # permitted", reporting "Seed not found" even for a genuinely correct phrase.
+        "--typos",
+        str(num_missing),
+        "--big-typos",
+        str(num_missing),
         *_target_flags(spec.addrs, spec.mpk, spec.addr_limit),
     ]
 

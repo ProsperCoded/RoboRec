@@ -18,6 +18,7 @@ if exist dist (
 for /f %%A in ('powershell -Command "(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors"') do set NUM_CORES=%%A
 echo Starting compilation on %NUM_CORES% cores...
 call .venv\Scripts\python.exe -m nuitka ^
+  --assume-yes-for-downloads ^
   --standalone ^
   --follow-imports ^
   --enable-plugin=pyside6 ^
@@ -29,6 +30,7 @@ call .venv\Scripts\python.exe -m nuitka ^
   --include-package=py_crypto_hd_wallet ^
   --include-package=numpy ^
   --include-package=pyopencl ^
+  --include-package-data=pyopencl ^
   --include-data-dir="src/robo_rec/gui/assets=robo_rec/gui/assets" ^
   --include-data-dir="vendor=vendor" ^
   --windows-icon-from-ico="src/robo_rec/gui/assets/app-icon.ico" ^
@@ -65,6 +67,7 @@ echo Building seedrecover.exe (recovery engine) with Nuitka...
 set "SEEDRECOVER_BUILD_DIR=%REPO_ROOT%dist\_seedrecover_build"
 pushd "%REPO_ROOT%vendor\btcrecover"
 call "%REPO_ROOT%.venv\Scripts\python.exe" -m nuitka ^
+  --assume-yes-for-downloads ^
   --standalone ^
   --follow-imports ^
   --include-package=btcrecover ^
@@ -75,6 +78,7 @@ call "%REPO_ROOT%.venv\Scripts\python.exe" -m nuitka ^
   --include-package=py_crypto_hd_wallet ^
   --include-package=numpy ^
   --include-package=pyopencl ^
+  --include-package-data=pyopencl ^
   --include-package=google.protobuf ^
   --include-data-dir="btcrecover/wordlists=btcrecover/wordlists" ^
   --include-data-dir="btcrecover/opencl=btcrecover/opencl" ^
