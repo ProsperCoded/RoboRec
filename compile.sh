@@ -68,6 +68,10 @@ SEEDRECOVER_BUILD_DIR="$REPO_ROOT/dist/_seedrecover_build"
     `# lib/'s data files are not bundled by --include-package alone, and lib/bitcoinlib` \
     `# reads config/VERSION at import time, so seedrecover.exe died instantly without them.` \
     --include-package-data=lib \
+    `# robo_rec_opencl_correctness.py sits next to seedrecover.py, reached only via a` \
+    `# conditional import (the sentinel-arg dispatch near the top of seedrecover.py) —` \
+    `# explicit rather than trusting --follow-imports to walk into that branch.` \
+    --include-module=robo_rec_opencl_correctness \
     --include-package=bip_utils \
     --include-package=coincurve \
     --include-package=Crypto \

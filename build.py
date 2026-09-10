@@ -22,6 +22,7 @@ def build():
         "--assume-yes-for-downloads",
         "--standalone",
         "--follow-imports",
+        "--enable-plugin=pyside6",
         "--include-package=robo_rec",
         "--include-package=bip_utils",
         "--include-package=coincurve",
@@ -106,6 +107,11 @@ def _build_seedrecover(repo_root: Path) -> int:
         # reads config/VERSION at import time, so seedrecover.exe died instantly without
         # them. Also covers lib/opencl_brute's kernels, needed for --enable-opencl.
         "--include-package-data=lib",
+        # robo_rec_opencl_correctness.py sits next to seedrecover.py, reached only via
+        # a conditional import (the sentinel-arg dispatch near the top of
+        # seedrecover.py) — explicit rather than trusting --follow-imports to walk
+        # into that branch.
+        "--include-module=robo_rec_opencl_correctness",
         "--include-package=bip_utils",
         "--include-package=coincurve",
         "--include-package=Crypto",

@@ -110,7 +110,12 @@ class GpuStatusPanel(BasePanel):
         self._refresh_button.setEnabled(False)
         self._summary_label.setText("Checking for a GPU…")
         self._summary_icon.setPixmap(load_pixmap("loader-circle", TEXT_SECONDARY, 20))
-        self._worker = GpuProbeWorker()
+        # force_recheck=True: this button is the only way to discard a cached OpenCL
+        # correctness verdict and actually redo the (slow) test — e.g. after a driver
+        # update that might have fixed a previously-broken GPU. MainWindow's own
+        # startup probe never does this, so a verdict is normally tested once per
+        # device/driver and then reused on every later launch.
+        self._worker = GpuProbeWorker(force_recheck=True)
         self._worker.finished.connect(self._on_report_finished)
         self._worker.start()
 
@@ -141,6 +146,18 @@ class GpuStatusPanel(BasePanel):
             self._summary_icon.setPixmap(load_pixmap("cpu", ACCENT, 20))
             self._summary_label.setText("GPU acceleration available")
             self._cpu_group.setVisible(False)
+        elif report.gpu_present_but_unusable:
+            # A device is present but failed (or has never passed) the correctness
+            # self-test — a real state, not a corner case: confirmed directly on an
+            # Intel iGPU driver that silently returned wrong PBKDF2 results with no
+            # error at all. Recovery uses CPU here despite hardware existing, so the
+            # badge must say that plainly rather than collapsing into "CPU Only" (which
+            # would hide that a GPU exists) or "GPU acceleration available" (which
+            # would be false).
+            self._summary_icon.setPixmap(load_pixmap("cpu", TEXT_SECONDARY, 20))
+            self._summary_label.setText("GPU detected but not usable — running on CPU")
+            self._populate_cpu_details(report.cpu_info)
+            self._cpu_group.setVisible(True)
         else:
             self._summary_icon.setPixmap(load_pixmap("cpu", TEXT_SECONDARY, 20))
             self._summary_label.setText("No GPU acceleration — running on CPU")
@@ -157,7 +174,15 @@ class GpuStatusPanel(BasePanel):
 
         if report.opencl_devices:
             device_names = ", ".join(d.name for d in report.opencl_devices)
-            self._opencl_label.setText(f"OpenCL devices: {device_names}")
+            text = f"OpenCL devices: {device_names}"
+            if report.opencl_usable is not None:
+                source = "cached result" if report.opencl_usability_cached else "just tested"
+                if report.opencl_usable:
+                    text += f"  ·  correctness check passed ({source})"
+                else:
+                    reason = report.opencl_usability_error or "correctness check failed"
+                    text += f"  ·  {reason} ({source}) — using CPU instead"
+            self._opencl_label.setText(text)
         else:
             self._opencl_label.setText("OpenCL: no devices available")
 
@@ -176,7 +201,9 @@ class GpuStatusPanel(BasePanel):
             self._errors_label.hide()
 
         if self._on_report_ready is not None:
-            self._on_report_ready(report.gpu_acceleration_available)
+            self._on_report_ready(
+                report.gpu_acceleration_available, report.gpu_present_but_unusable
+            )
 
     def _populate_cpu_details(self, cpu_info) -> None:
         self._cpu_model_label.setText(cpu_info.model_name or "Model name unavailable")

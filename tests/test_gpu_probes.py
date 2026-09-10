@@ -7,6 +7,12 @@ from robo_rec.gpu.opencl_probe import OpenClProbeResult, probe_opencl
 from robo_rec.gpu.pycuda_probe import probe_pycuda_importable
 from robo_rec.gpu.report import probe_gpu_status
 
+# probe_gpu_status() shells out to the correctness probe (compiles/runs a real OpenCL
+# kernel) whenever OpenCL is available — mocked out in every test below so the suite
+# stays fast and doesn't depend on this machine's specific GPU/driver.
+_CORRECTNESS_PROBE_PATCH = "robo_rec.gpu.report.probe_opencl_correctness"
+_DEVICE_SIGNATURE_PATCH = "robo_rec.gpu.report.probe_opencl_device_signature"
+
 
 def test_probe_gpu_status_degrades_gracefully_with_no_gpu():
     """The no-GPU behavior must not depend on the machine running the tests."""
@@ -30,7 +36,11 @@ def test_probe_gpu_status_degrades_gracefully_with_no_gpu():
 
 
 def test_probe_gpu_status_always_includes_cpu_info():
-    report = probe_gpu_status()
+    with patch(
+        "robo_rec.gpu.report.probe_opencl",
+        return_value=OpenClProbeResult(available=False, devices=[], error=None),
+    ):
+        report = probe_gpu_status()
     assert report.cpu_info.architecture
     assert report.cpu_info.os_name
     assert report.cpu_info.logical_cores is not None and report.cpu_info.logical_cores > 0

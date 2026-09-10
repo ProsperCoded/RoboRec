@@ -117,6 +117,19 @@ QMainWindow, #ContentArea {{
     color: {TEXT_SECONDARY};
 }}
 
+/* A GPU is present but failed its OpenCL correctness self-test (see
+   robo_rec.gpu.correctness_probe) — recovery falls back to CPU despite the hardware
+   existing. Distinct from "unavailable" (no GPU at all) so the badge doesn't hide
+   that there's a real, if currently unusable, GPU in the machine. */
+#GpuBadge[state="present-but-unusable"] {{
+    background-color: {WARNING_DIM};
+    border: 1px solid {WARNING};
+}}
+
+#GpuBadge[state="present-but-unusable"] QLabel {{
+    color: {WARNING};
+}}
+
 /* ---- Dashboard ---- */
 #DashboardTitle {{
     font-size: 22px;

@@ -19,20 +19,29 @@ from robo_rec.gpu.report import GpuStatusReport, probe_gpu_status
 class _ProbeTask(QObject):
     finished = Signal(object)  # GpuStatusReport
 
+    def __init__(self, *, force_recheck: bool) -> None:
+        super().__init__()
+        self._force_recheck = force_recheck
+
     def run(self) -> None:
-        self.finished.emit(probe_gpu_status())
+        self.finished.emit(probe_gpu_status(force_recheck=self._force_recheck))
 
 
 class GpuProbeWorker(QObject):
     """Create on the Qt main thread, connect to `finished`, call start(). One-shot — create
-    a fresh GpuProbeWorker for each re-probe (e.g. a Refresh button)."""
+    a fresh GpuProbeWorker for each re-probe (e.g. a Refresh button).
+
+    force_recheck=True bypasses the cached OpenCL correctness verdict (see
+    robo_rec.gpu.correctness_cache) and re-runs the full test for this device/driver —
+    what the GPU Status panel's "Re-check GPU" button asks for. The default False path
+    is what MainWindow's startup probe uses: cheap when a verdict is already cached."""
 
     finished = Signal(object)  # GpuStatusReport
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(self, parent: QObject | None = None, *, force_recheck: bool = False) -> None:
         super().__init__(parent)
         self._thread = QThread(self)
-        self._task = _ProbeTask()
+        self._task = _ProbeTask(force_recheck=force_recheck)
         self._task.moveToThread(self._thread)
         self._task.finished.connect(self.finished)
         self._task.finished.connect(self._thread.quit)

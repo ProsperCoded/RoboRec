@@ -88,6 +88,11 @@ try {
         # lib\bitcoinlib\config\VERSION" before searching a single candidate. Also covers
         # lib/opencl_brute's kernels, needed for --enable-opencl. ~2MB total.
         "--include-package-data=lib"
+        # robo_rec_opencl_correctness.py sits next to seedrecover.py and is only
+        # reached via a conditional import inside an `if` block (see the sentinel-arg
+        # dispatch near the top of seedrecover.py) — explicit, rather than trusting
+        # --follow-imports's static analysis to walk into a conditional branch.
+        "--include-module=robo_rec_opencl_correctness"
         "--include-package=bip_utils"
         "--include-package=coincurve"
         "--include-package=Crypto"

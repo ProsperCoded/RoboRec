@@ -73,6 +73,7 @@ call "%REPO_ROOT%.venv\Scripts\python.exe" -m nuitka ^
   --include-package=btcrecover ^
   --include-package=lib ^
   --include-package-data=lib ^
+  --include-module=robo_rec_opencl_correctness ^
   --include-package=bip_utils ^
   --include-package=coincurve ^
   --include-package=Crypto ^

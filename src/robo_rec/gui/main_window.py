@@ -29,7 +29,7 @@ from robo_rec.gui.panels.rearrange import RearrangePanel
 from robo_rec.gui.panels.typo_correction import TypoCorrectionPanel
 from robo_rec.gui.sidebar import Sidebar
 from robo_rec.gui.terminal_sidebar import TerminalSidebar
-from robo_rec.gui.theme import ACCENT, STYLESHEET, TEXT_SECONDARY
+from robo_rec.gui.theme import ACCENT, STYLESHEET, TEXT_SECONDARY, WARNING
 from robo_rec.gui.widgets.animated_stack import AnimatedStackedWidget
 
 
@@ -166,15 +166,30 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self._reposition_terminal_widget()
 
-    def set_gpu_status(self, detected: bool) -> None:
+    def set_gpu_status(self, detected: bool, present_but_unusable: bool = False) -> None:
         """Update the top-bar GPU badge and the process-wide GPU-availability cache that
         recovery panels read for their time estimates. Called once at startup with a real
-        probe result, and again whenever the GPU Status panel re-checks."""
+        probe result, and again whenever the GPU Status panel re-checks.
+
+        detected means "recovery will actually request GPU acceleration" (presence AND
+        a passed correctness check — see GpuStatusReport.gpu_acceleration_available),
+        not just "a device exists". present_but_unusable is the third state worth
+        surfacing on its own: a GPU IS present but failed its correctness self-test, so
+        recovery falls back to CPU despite the hardware being there — confirmed as a
+        real, not hypothetical, case on an Intel iGPU driver that silently returned
+        wrong PBKDF2 results. Collapsing that into "CPU Only" would hide that a GPU
+        exists; collapsing it into "GPU Detected" would claim it's being used when
+        it isn't."""
         set_gpu_available(detected)
-        color = ACCENT if detected else TEXT_SECONDARY
+        if detected:
+            color, text, state = ACCENT, "GPU Detected", "detected"
+        elif present_but_unusable:
+            color, text, state = WARNING, "GPU Unavailable", "present-but-unusable"
+        else:
+            color, text, state = TEXT_SECONDARY, "CPU Only", "unavailable"
         self._gpu_badge_icon.setPixmap(load_pixmap("cpu", color, 14))
-        self._gpu_badge_text.setText("GPU Detected" if detected else "CPU Only")
-        self._gpu_badge.setProperty("state", "detected" if detected else "unavailable")
+        self._gpu_badge_text.setText(text)
+        self._gpu_badge.setProperty("state", state)
         self._gpu_badge.style().unpolish(self._gpu_badge)
         self._gpu_badge.style().polish(self._gpu_badge)
 
@@ -186,7 +201,7 @@ class MainWindow(QMainWindow):
         self._startup_gpu_worker.start()
 
     def _on_startup_gpu_probe_finished(self, report) -> None:
-        self.set_gpu_status(report.gpu_acceleration_available)
+        self.set_gpu_status(report.gpu_acceleration_available, report.gpu_present_but_unusable)
         # Feed the same probe result to the GPU Status panel instead of letting it run
         # its own — see gpu_status.py's comment on why a second concurrent probe there
         # was the likely cause of "detected once, CPU-only the next run" inconsistency.
