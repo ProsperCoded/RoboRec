@@ -28,6 +28,8 @@ $nuitkaArgs = @(
     "--enable-plugin=pyside6"
     "--include-package=robo_rec"
     "--include-package=bip_utils"
+    # bip_utils reads its BIP39 wordlists from data files at runtime (mnemonic checks, Derive Wallet).
+    "--include-package-data=bip_utils"
     "--include-package=coincurve"
     "--include-package=PySide6"
     "--include-package=Crypto"
@@ -94,6 +96,8 @@ try {
         # --follow-imports's static analysis to walk into a conditional branch.
         "--include-module=robo_rec_opencl_correctness"
         "--include-package=bip_utils"
+        # The engine's Solana path decodes mnemonics via bip_utils' wordlists too.
+        "--include-package-data=bip_utils"
         "--include-package=coincurve"
         "--include-package=Crypto"
         "--include-package=py_crypto_hd_wallet"

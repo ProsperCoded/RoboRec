@@ -44,6 +44,8 @@ class _RunnerTask(QObject):
                     self.finished.emit(recovery_event.result)
         except RecoveryError as exc:
             self.failed.emit(str(exc))
+        except Exception as exc:  # noqa: BLE001 - anything else would vanish and leave the GUI spinning forever
+            self.failed.emit(f"Unexpected error: {type(exc).__name__}: {exc}")
 
 
 class RecoveryWorker(QObject):

@@ -24,6 +24,7 @@ call .venv\Scripts\python.exe -m nuitka ^
   --enable-plugin=pyside6 ^
   --include-package=robo_rec ^
   --include-package=bip_utils ^
+  --include-package-data=bip_utils ^
   --include-package=coincurve ^
   --include-package=PySide6 ^
   --include-package=Crypto ^
@@ -75,6 +76,7 @@ call "%REPO_ROOT%.venv\Scripts\python.exe" -m nuitka ^
   --include-package-data=lib ^
   --include-module=robo_rec_opencl_correctness ^
   --include-package=bip_utils ^
+  --include-package-data=bip_utils ^
   --include-package=coincurve ^
   --include-package=Crypto ^
   --include-package=py_crypto_hd_wallet ^
