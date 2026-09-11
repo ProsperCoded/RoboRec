@@ -14,6 +14,15 @@ dependencies = [
     "py-crypto-hd-wallet>=1.3.3",
     "numpy>=2.4.6",
     "pyopencl>=2026.1.4",
+    # Not a runtime import of robo_rec itself (never bundled into the compiled app — none
+    # of compile.ps1/.sh/.bat/build.py pass --include-package=nuitka), but every one of
+    # those build scripts shells out to `python -m nuitka` unconditionally, so it's
+    # required in every dev environment that will ever run a build, not just an optional
+    # "build" extra. Previously lived in [dependency-groups].build, which only gets
+    # installed by `uv sync --group build` — a plain `pip install -e .` (this project's
+    # actual setup, no uv present) silently skipped it, so the first `compile.ps1` run in
+    # a fresh venv always failed with "No module named nuitka".
+    "nuitka>=2.4",
 ]
 
 [project.optional-dependencies]
@@ -26,9 +35,6 @@ dev = [
     "pytest>=8.0",
     "pytest-qt>=4.4",
     "ruff>=0.6",
-]
-build = [
-    "nuitka>=2.4",
 ]
 
 [build-system]
