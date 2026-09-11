@@ -1,16 +1,22 @@
 """GPU Status panel — wired to robo_rec.gpu via GpuProbeWorker (PRD 4.5).
 
 Shows NVIDIA driver/CUDA toolkit presence, OpenCL device availability, and PyCUDA
-importability, with a JSON export so the client can send diagnostics back to the developer
-(the developer's own hardware has no discrete GPU, so real-world validation depends on this
-export — PRD 4.5/6.3).
+importability. "Run Full Diagnostics & Export" goes well beyond a GPU snapshot: it re-runs
+the GPU probe, runs a live BTC/ETH/SOL recovery self-test, and bundles in recent
+recovery-run history, so the exported file is actually useful for debugging a real failed
+search, not just "was a GPU found" (PRD 4.5/6.3; see robo_rec.diagnostics.report). The
+"Include sensitive data" checkbox controls whether real addresses/words/recovered phrases
+go into that file unredacted — off by default, since this file is meant to be handed to
+someone else for debugging.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -20,7 +26,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from robo_rec.gpu.report import GpuStatusReport, export_json
+from robo_rec.gpu.report import GpuStatusReport
+from robo_rec.gui.diagnostics_worker import DiagnosticsWorker
+from robo_rec.gui.gpu_state import is_gpu_available
 from robo_rec.gui.gpu_worker import GpuProbeWorker
 from robo_rec.gui.icons import load_pixmap
 from robo_rec.gui.panels.base_panel import BasePanel
@@ -32,11 +40,13 @@ class GpuStatusPanel(BasePanel):
         super().__init__(
             "GPU Status",
             "Robo-Rec detects NVIDIA GPU acceleration automatically — this view shows "
-            "what it found, and lets you export a diagnostics report.",
+            "what it found, and lets you export a full diagnostics report.",
             parent,
         )
 
         self._worker: GpuProbeWorker | None = None
+        self._diagnostics_worker: DiagnosticsWorker | None = None
+        self._export_target_path: Path | None = None
         self._latest_report: GpuStatusReport | None = None
         self._on_report_ready = None  # optional callback set by MainWindow
 
@@ -81,12 +91,38 @@ class GpuStatusPanel(BasePanel):
         self._errors_label.hide()
         self.root_layout.addWidget(self._errors_label)
 
+        diagnostics_group = QGroupBox("Diagnostics Report")
+        diagnostics_layout = QVBoxLayout(diagnostics_group)
+
+        diagnostics_hint = QLabel(
+            "Re-runs the GPU check, runs a live BTC/ETH/SOL recovery test, and bundles in "
+            "your recent recovery runs — everything needed to debug a search that didn't "
+            "behave as expected. Takes a few minutes."
+        )
+        diagnostics_hint.setWordWrap(True)
+        diagnostics_hint.setObjectName("PanelDescription")
+        diagnostics_layout.addWidget(diagnostics_hint)
+
+        self._include_sensitive_checkbox = QCheckBox(
+            "Include sensitive data (addresses, seed words, recovered phrases) unredacted"
+        )
+        self._include_sensitive_checkbox.setChecked(False)
+        diagnostics_layout.addWidget(self._include_sensitive_checkbox)
+
+        self._diagnostics_status_label = QLabel()
+        self._diagnostics_status_label.setWordWrap(True)
+        self._diagnostics_status_label.setObjectName("InfoNotice")
+        self._diagnostics_status_label.hide()
+        diagnostics_layout.addWidget(self._diagnostics_status_label)
+
+        self.root_layout.addWidget(diagnostics_group)
+
         buttons_row = QHBoxLayout()
         self._refresh_button = QPushButton("Re-check GPU")
         self._refresh_button.clicked.connect(self._start_probe)
         buttons_row.addWidget(self._refresh_button)
 
-        self._export_button = QPushButton("Export Diagnostics (JSON)")
+        self._export_button = QPushButton("Run Full Diagnostics && Export")
         self._export_button.setObjectName("PrimaryButton")
         self._export_button.clicked.connect(self._on_export_clicked)
         self._export_button.setEnabled(False)
@@ -122,10 +158,17 @@ class GpuStatusPanel(BasePanel):
     def shutdown(self) -> None:
         """Called from MainWindow.closeEvent: wait for any in-flight probe so its
         background QThread doesn't get destroyed while still running. GPU probes have no
-        cancel() (they're not long-running searches) — just join whatever's in flight."""
+        cancel() (they're not long-running searches) — just join whatever's in flight.
+
+        The diagnostics self-test has no cancel() either (unlike a normal recovery search),
+        so closing the window while one is running blocks briefly until it finishes — an
+        accepted tradeoff given how rarely a close would land mid-self-test."""
         if self._worker is not None:
             self._worker.wait_and_cleanup()
             self._worker = None
+        if self._diagnostics_worker is not None:
+            self._diagnostics_worker.wait_and_cleanup()
+            self._diagnostics_worker = None
 
     def _on_report_finished(self, report: GpuStatusReport) -> None:
         self._refresh_button.setEnabled(True)
@@ -220,17 +263,52 @@ class GpuStatusPanel(BasePanel):
         self._on_report_ready = callback
 
     def _on_export_clicked(self) -> None:
-        if self._latest_report is None:
-            return
-        default_name = "robo-rec-gpu-diagnostics.json"
+        # Ask where to save *before* running the (multi-minute) self-test, so a user who
+        # changes their mind at the file dialog never pays that cost for nothing.
+        default_name = "robo-rec-diagnostics.json"
         path_str, _ = QFileDialog.getSaveFileName(
-            self, "Export GPU Diagnostics", default_name, "JSON files (*.json)"
+            self, "Export Diagnostics Report", default_name, "JSON files (*.json)"
         )
         if not path_str:
             return
+        self._export_target_path = Path(path_str)
+
+        self._export_button.setEnabled(False)
+        self._refresh_button.setEnabled(False)
+        self._include_sensitive_checkbox.setEnabled(False)
+        self._diagnostics_status_label.setText(
+            "Running diagnostics — GPU probe, then a live BTC/ETH/SOL recovery self-test. "
+            "This takes a few minutes; the app will stay responsive."
+        )
+        self._diagnostics_status_label.show()
+
+        self._diagnostics_worker = DiagnosticsWorker(
+            use_gpu_for_self_test=is_gpu_available(),
+            include_sensitive=self._include_sensitive_checkbox.isChecked(),
+        )
+        self._diagnostics_worker.finished.connect(self._on_diagnostics_ready)
+        self._diagnostics_worker.failed.connect(self._on_diagnostics_failed)
+        self._diagnostics_worker.start()
+
+    def _reset_diagnostics_controls(self) -> None:
+        self._export_button.setEnabled(True)
+        self._refresh_button.setEnabled(True)
+        self._include_sensitive_checkbox.setEnabled(True)
+        self._diagnostics_status_label.hide()
+        if self._diagnostics_worker is not None:
+            self._diagnostics_worker.wait_and_cleanup()
+            self._diagnostics_worker = None
+
+    def _on_diagnostics_ready(self, report: dict) -> None:
+        path = self._export_target_path
+        self._reset_diagnostics_controls()
         try:
-            export_json(self._latest_report, Path(path_str))
+            path.write_text(json.dumps(report, indent=2), encoding="utf-8")
         except OSError as exc:
             QMessageBox.critical(self, "Export failed", str(exc))
             return
-        QMessageBox.information(self, "Exported", f"Diagnostics saved to:\n{path_str}")
+        QMessageBox.information(self, "Exported", f"Diagnostics report saved to:\n{path}")
+
+    def _on_diagnostics_failed(self, error: str) -> None:
+        self._reset_diagnostics_controls()
+        QMessageBox.critical(self, "Diagnostics failed", error)

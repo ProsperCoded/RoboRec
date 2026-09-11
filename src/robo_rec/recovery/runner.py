@@ -11,7 +11,9 @@ from __future__ import annotations
 import os
 import subprocess
 import threading
+import time
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 from robo_rec.recovery.args import (
@@ -21,6 +23,7 @@ from robo_rec.recovery.args import (
     build_typo_correction_args,
 )
 from robo_rec.recovery.exceptions import LaunchError
+from robo_rec.recovery.history import RunRecord, cap_log_lines, record as record_run
 from robo_rec.recovery.models import (
     MissingWordKnownPositionSpec,
     MissingWordUnknownPositionSpec,
@@ -96,12 +99,23 @@ class BtcrecoverRunner:
         argv, tokenlist_path = _build_argv_and_tokenlist(self._spec, use_gpu=self._use_gpu)
         self._tokenlist_path = tokenlist_path
         full_argv = [*seedrecover_command(), *argv]
+        start_time = time.time()
 
         try:
             process, lines = stream_lines(
                 full_argv, cwd=self._btcrecover_dir, stop_event=self._stop_event
             )
         except OSError as exc:
+            self._record_run(
+                argv=argv,
+                start_time=start_time,
+                return_code=None,
+                succeeded=False,
+                mnemonic=None,
+                matched_path=None,
+                log_lines=[],
+                launch_error=str(exc),
+            )
             raise LaunchError(f"Failed to launch seedrecover: {exc}") from exc
 
         # Assign self._process BEFORE yielding: cancel() reads self._process, and once
@@ -115,10 +129,13 @@ class BtcrecoverRunner:
         found_result: RecoveryResult | None = None
         mnemonic: str | None = None
         matched_path: str | None = None
+        log_lines: list[str] = []
 
         try:
             for line in lines:
                 event = parse_line(line)
+                if event.raw_line is not None:
+                    log_lines.append(event.raw_line)
                 if event.kind == "found" and event.result is not None:
                     if event.result.mnemonic is not None:
                         mnemonic = event.result.mnemonic
@@ -138,10 +155,55 @@ class BtcrecoverRunner:
             return_code=return_code,
             succeeded=succeeded,
         )
+        self._record_run(
+            argv=argv,
+            start_time=start_time,
+            return_code=return_code,
+            succeeded=succeeded,
+            mnemonic=mnemonic,
+            matched_path=matched_path,
+            log_lines=log_lines,
+            launch_error=None,
+        )
         yield RecoveryEvent(
             kind="finished",
             message="Recovery finished." if succeeded else "Recovery finished: not found.",
             result=found_result,
+        )
+
+    def _record_run(
+        self,
+        *,
+        argv: list[str],
+        start_time: float,
+        return_code: int | None,
+        succeeded: bool,
+        mnemonic: str | None,
+        matched_path: str | None,
+        log_lines: list[str],
+        launch_error: str | None,
+    ) -> None:
+        """Feeds robo_rec.diagnostics.report via robo_rec.recovery.history — see that
+        module's docstring for why this stores everything unredacted (redaction happens at
+        export time, not here)."""
+        record_run(
+            RunRecord(
+                timestamp=datetime.now(UTC),
+                scenario=type(self._spec).__name__,
+                wallet_type=getattr(self._spec, "wallet_type", "?"),
+                gpu_requested=self._use_gpu,
+                gpu_actually_used="--enable-opencl" in argv,
+                argv=argv,
+                duration_seconds=time.time() - start_time,
+                return_code=return_code,
+                succeeded=succeeded,
+                cancelled=self._stop_event.is_set(),
+                recovered_mnemonic=mnemonic,
+                matched_address=self._first_target_address(),
+                matched_path=matched_path,
+                log_lines=cap_log_lines(log_lines),
+                launch_error=launch_error,
+            )
         )
 
     def _first_target_address(self) -> str | None:
