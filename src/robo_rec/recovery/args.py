@@ -46,8 +46,21 @@ _WORKER_THREADS = max(1, (os.cpu_count() or 1) - 1)
 _COMMON_FLAGS = ["--no-gui", "--dsw", "--threads", str(_WORKER_THREADS)]
 
 
-def _gpu_flags(use_gpu: bool) -> list[str]:
-    return ["--enable-opencl"] if use_gpu else []
+# Wallet classes that implement btcrseed.py's _return_verified_password_or_false_opencl
+# (WalletBIP32 and its subclasses WalletBIP39/WalletEthereum). WalletSolana
+# (WalletPyCryptoHDWallet) has no OpenCL path at all — passing --enable-opencl for it makes
+# seedrecover.py's own arg-parsing call btcrpass.error_exit("... does not support OpenCL
+# acceleration") and exit immediately, before any candidates are even generated. Confirmed by
+# direct testing: a GPU-requested Solana search "succeeds" (subprocess exits 0) in ~2s with no
+# result, which looks identical to a real exhausted search from the GUI's side — so this can't
+# be left to fail loudly on its own; it must simply never be requested.
+_OPENCL_CAPABLE_WALLET_TYPES = {"bip39", "ethereum"}
+
+
+def _gpu_flags(use_gpu: bool, wallet_type: str) -> list[str]:
+    if use_gpu and wallet_type in _OPENCL_CAPABLE_WALLET_TYPES:
+        return ["--enable-opencl"]
+    return []
 
 
 def _typo_flags(num_blanks: int, known_words: list[str]) -> list[str]:
@@ -96,7 +109,7 @@ def build_rearrangement_args(
     )
     argv = [
         *_COMMON_FLAGS,
-        *_gpu_flags(use_gpu),
+        *_gpu_flags(use_gpu, spec.wallet_type),
         "--wallet-type",
         spec.wallet_type,
         "--tokenlist",
@@ -124,7 +137,7 @@ def build_missing_word_known_position_args(
     num_missing = sum(1 for word in spec.words if word is None)
     return [
         *_COMMON_FLAGS,
-        *_gpu_flags(use_gpu),
+        *_gpu_flags(use_gpu, spec.wallet_type),
         "--wallet-type",
         spec.wallet_type,
         "--mnemonic",
@@ -146,7 +159,7 @@ def build_missing_word_unknown_position_args(
     num_missing = spec.full_length - len(spec.words)
     return [
         *_COMMON_FLAGS,
-        *_gpu_flags(use_gpu),
+        *_gpu_flags(use_gpu, spec.wallet_type),
         "--wallet-type",
         spec.wallet_type,
         "--mnemonic",
@@ -162,7 +175,7 @@ def build_missing_word_unknown_position_args(
 def build_typo_correction_args(spec: TypoCorrectionSpec, *, use_gpu: bool = False) -> list[str]:
     argv = [
         *_COMMON_FLAGS,
-        *_gpu_flags(use_gpu),
+        *_gpu_flags(use_gpu, spec.wallet_type),
         "--wallet-type",
         spec.wallet_type,
         "--mnemonic",
