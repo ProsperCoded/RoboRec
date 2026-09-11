@@ -20,6 +20,13 @@ def build():
         "-m",
         "nuitka",
         "--assume-yes-for-downloads",
+        # --mingw64 forces Nuitka to download/use its OWN managed toolchain instead of
+        # auto-detecting whatever compiler is already on this machine. NOT passed below —
+        # auto-detection is faster whenever it already works, and that download is ~267MB.
+        # Add "--mingw64" back ONLY if a plain build fails with a compiler-arch-mismatch
+        # warning followed by "windows.h: No such file or directory" — see compile.ps1's
+        # comment for the full explanation of that failure mode.
+        # "--mingw64",
         "--standalone",
         "--follow-imports",
         "--enable-plugin=pyside6",
@@ -101,6 +108,8 @@ def _build_seedrecover(repo_root: Path) -> int:
         "-m",
         "nuitka",
         "--assume-yes-for-downloads",
+        # See the main build stage's comment re: --mingw64 — not passed here either.
+        # "--mingw64",
         "--standalone",
         "--follow-imports",
         "--include-package=btcrecover",

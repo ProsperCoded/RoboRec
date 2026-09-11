@@ -17,6 +17,12 @@ if exist dist (
 
 for /f %%A in ('powershell -Command "(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors"') do set NUM_CORES=%%A
 echo Starting compilation on %NUM_CORES% cores...
+REM --mingw64 forces Nuitka to download/use its OWN managed toolchain instead of
+REM auto-detecting whatever compiler is already on this machine. NOT passed below --
+REM auto-detection is faster whenever it already works, and that download is ~267MB.
+REM Add "--mingw64 ^" as its own line right after --assume-yes-for-downloads ONLY if a
+REM plain build fails with a compiler-arch-mismatch warning followed by "windows.h: No
+REM such file or directory" -- see compile.ps1's comment for the full explanation.
 call .venv\Scripts\python.exe -m nuitka ^
   --assume-yes-for-downloads ^
   --standalone ^
@@ -67,6 +73,7 @@ echo Building seedrecover.exe (recovery engine) with Nuitka...
 
 set "SEEDRECOVER_BUILD_DIR=%REPO_ROOT%dist\_seedrecover_build"
 pushd "%REPO_ROOT%vendor\btcrecover"
+REM See the main build stage's comment above re: --mingw64 -- not passed here either.
 call "%REPO_ROOT%.venv\Scripts\python.exe" -m nuitka ^
   --assume-yes-for-downloads ^
   --standalone ^

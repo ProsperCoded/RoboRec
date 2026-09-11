@@ -15,6 +15,12 @@ NUM_CORES=$(nproc 2>/dev/null || echo 4)
 
 .venv/bin/python -m nuitka \
   --assume-yes-for-downloads \
+  `# --mingw64 forces Nuitka to download/use its OWN managed toolchain instead of` \
+  `# auto-detecting whatever compiler is already on this machine. NOT passed below --` \
+  `# auto-detection is faster whenever it already works, and that download is ~267MB.` \
+  `# Add a "--mingw64 \" line right after --assume-yes-for-downloads ONLY if a plain` \
+  `# build fails with a compiler-arch-mismatch warning followed by "windows.h: No such` \
+  `# file or directory" -- see compile.ps1's comment for the full explanation.` \
   --standalone \
   --follow-imports \
   --enable-plugin=pyside6 \
@@ -63,6 +69,7 @@ SEEDRECOVER_BUILD_DIR="$REPO_ROOT/dist/_seedrecover_build"
   cd "$REPO_ROOT/vendor/btcrecover"
   "$REPO_ROOT/.venv/bin/python" -m nuitka \
     --assume-yes-for-downloads \
+  `# See the main build stage's comment re: --mingw64 -- not passed here either.` \
     --standalone \
     --follow-imports \
     --include-package=btcrecover \

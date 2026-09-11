@@ -17,12 +17,42 @@ if ($Clean -and (Test-Path "dist")) {
     Remove-Item -Recurse -Force dist
 }
 
+# Nuitka's own cache (downloaded MinGW64 toolchain included) defaults to
+# appdirs.user_cache_dir("Nuitka"), which under a Microsoft Store Python install resolves
+# into that package's virtualized, deeply-nested AppData folder (something like
+# ...\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_<hash>\LocalCache\...).
+# The downloaded MinGW64's own header path nested inside that is long enough that gcc's
+# `#include <windows.h>` silently failed to resolve ("No such file or directory") even
+# though the file genuinely existed on disk (confirmed directly) — a Windows path-length
+# problem, not a missing or corrupt download. Pointing NUITKA_CACHE_DIR at a short, plain
+# path sidesteps it entirely.
+$env:NUITKA_CACHE_DIR = "C:\NuitkaCache"
+
 $numCores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 Write-Host "Starting compilation on $numCores cores..." -ForegroundColor Cyan
 $nuitkaArgs = @(
     "-m"
     "nuitka"
     "--assume-yes-for-downloads"
+    # --mingw64 forces Nuitka to download and use its OWN managed MinGW64 toolchain
+    # instead of auto-detecting whatever gcc is already on this machine (e.g. a
+    # system-installed TDM-GCC-64). Left DISABLED (commented out) by default because that
+    # download is ~267MB from GitHub and was unreliable on this machine's connection
+    # (repeated mid-download resets); auto-detection is faster whenever it already works.
+    #
+    # ENABLE THIS (uncomment "--mingw64" below) only if a plain build fails with something
+    # like:
+    #   Nuitka-Scons: Mismatch between Python binary (...) and C compiler (...) arches,
+    #   that compiler is ignored!
+    #   ...fatal error: windows.h: No such file or directory
+    # That means Nuitka's own arch probe (objdump on the compiler's .exe) decided the
+    # detected gcc doesn't match — confirmed directly on this machine's TDM-GCC-64, whose
+    # gcc.exe binary really does report as the 32-bit "pei-i386" PE format even though it
+    # correctly targets/produces 64-bit output (verified: it compiles a windows.h-using
+    # 64-bit test program fine standalone) — Nuitka's safety check rejects it anyway, and
+    # partway into the real build ends up reaching for it regardless, causing the above
+    # error. --mingw64 sidesteps that by using a toolchain Nuitka trusts outright.
+    # "--mingw64"
     "--standalone"
     "--follow-imports"
     "--enable-plugin=pyside6"
@@ -79,6 +109,10 @@ try {
         "-m"
         "nuitka"
         "--assume-yes-for-downloads"
+        # See the main build stage's comment above (same flag, same reasoning) — disabled
+        # by default, only uncomment if a plain build fails with a
+        # "windows.h: No such file or directory" / compiler-arch-mismatch error.
+        # "--mingw64"
         "--standalone"
         "--follow-imports"
         "--include-package=btcrecover"
