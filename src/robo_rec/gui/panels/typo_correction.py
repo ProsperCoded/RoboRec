@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from robo_rec.derivation import validate_address
 from robo_rec.gui.coin_options import (
     COIN_OPTION_LABELS,
     UNSUPPORTED_COIN_MESSAGE,
@@ -190,6 +191,11 @@ class TypoCorrectionPanel(BasePanel):
         coin = coin_for_label(self._token_combo.currentText())
         if coin is None:
             QMessageBox.warning(self, "Unsupported token", UNSUPPORTED_COIN_MESSAGE)
+            return
+
+        address_error = validate_address(address, coin)
+        if address_error is not None:
+            QMessageBox.warning(self, "Address doesn't look right", address_error)
             return
 
         words = self._seed_row.words()

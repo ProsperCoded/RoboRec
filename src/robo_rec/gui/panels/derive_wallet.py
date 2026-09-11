@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from robo_rec.derivation import derive_addresses, verify_address
+from robo_rec.derivation import derive_addresses, validate_address, verify_address
 from robo_rec.gui.coin_options import COIN_OPTION_LABELS, UNSUPPORTED_COIN_MESSAGE, coin_for_label
 from robo_rec.gui.panels.base_panel import BasePanel
 from robo_rec.gui.widgets.copy_button import CopyButton
@@ -123,6 +123,12 @@ class DeriveWalletPanel(BasePanel):
             return
 
         target = self._address_field.text().strip()
+
+        if target:
+            address_error = validate_address(target, coin)
+            if address_error is not None:
+                QMessageBox.warning(self, "Address doesn't look right", address_error)
+                return
 
         self._clear_results()
 
